@@ -10,14 +10,14 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
+    - repoURL: https://github.com/red-hat-data-services/genaidemo25-gitops.git
       targetRevision: main
       path: shared-cluster/deploy-model
       helm:
         releaseName: gpt-oss-20b
         valueFiles:
           - "gpt-oss-20b.yaml"
-    - repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
+    - repoURL: https://github.com/red-hat-data-services/genaidemo25-gitops.git
       targetRevision: main
       path: shared-cluster/deploy-model
       helm:
@@ -28,7 +28,11 @@ spec:
     server: "https://kubernetes.default.svc"
     namespace: "genai25-deployments"
   syncPolicy:
+    managedNamespaceMetadata:
+      labels:
+        argocd.argoproj.io/managed-by: openshift-gitops
     automated:
-      prune: true
-      selfHeal: true
-    syncOptions: []
+      prune: false
+      selfHeal: false
+    syncOptions:
+      - CreateNamespace=true
