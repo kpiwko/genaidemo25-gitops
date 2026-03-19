@@ -12,3 +12,6 @@ shared-cluster/deploy-model/values.yaml
 # Temporary files
 *.tmp
 *.bak
+
+# Secret management scripts (contain or generate real credentials)
+module-hsworkshop/apply-secrets.sh
