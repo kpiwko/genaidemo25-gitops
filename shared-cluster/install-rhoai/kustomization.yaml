@@ -13,6 +13,7 @@ resources:
   - rbac/cluster-role-binding-dsc.yaml
   - rbac/argocd-istio-routes-rbac.yaml
   - rbac/argocd-rbac.yaml
+  - rbac/argocd-trustyai-rbac.yaml
   # wave 4 install rhoai operator
   - rhoai-operator/operator-group.yaml
   - rhoai-operator/subscription-rhoai.yaml

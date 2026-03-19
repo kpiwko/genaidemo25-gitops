@@ -9,4 +9,4 @@ resources:
   - clickhouse.yaml
   - langfuse.yaml
   - openwebui.yaml
-  # guardrails.yaml excluded - requires additional ClusterRole for trustyai.opendatahub.io CRDs
+  - guardrails.yaml
