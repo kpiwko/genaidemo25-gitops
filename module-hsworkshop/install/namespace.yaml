@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hsworkshop
+  labels:
+    # Required for RHOAI dashboard and KServe to manage this namespace
+    opendatahub.io/dashboard: "true"
+    # Required for Istio sidecar injection (KServe Serverless mode)
+    istio-injection: enabled
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: baseline

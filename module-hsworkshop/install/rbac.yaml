@@ -1,0 +1,20 @@
+# ServiceAccount + SCC bindings for components that require anyuid
+# OpenWebUI and Langfuse are not built for arbitrary-uid OpenShift environments
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hsworkshop-anyuid
+  namespace: hsworkshop
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hsworkshop-anyuid
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:anyuid
+subjects:
+  - kind: ServiceAccount
+    name: hsworkshop-anyuid
+    namespace: hsworkshop

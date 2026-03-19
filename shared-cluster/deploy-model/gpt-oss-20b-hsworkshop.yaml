@@ -1,14 +1,14 @@
 model:
-  name: "oss-gpt-20b"
+  name: "gpt-oss-20b"
   displayName: "GPT-OSS 20B"
   sourceUri: "oci://quay.io/castawayegr/modelcar-catalog:gpt-oss-20b"
   format: "vLLM"
 
 namespace:
-  name: "genai25-deployments"
+  name: "hsworkshop"
 
 runtime:
-  name: "vllm-cuda-runtime-gptoss"
+  name: "vllm-cuda-runtime-gptoss-hs"
   displayName: "GPT-OSS 20B vLLM Runtime"
   image: "registry.redhat.io/rhaiis/vllm-cuda-rhel9@sha256:ec799bb5eeb7e25b4b25a8917ab5161da6b6f1ab830cbba61bba371cffb0c34d"
   annotations:
@@ -19,16 +19,17 @@ runtime:
     runtimeVersion: "v0.13.0"
     servingRuntimeScope: "global"
     templateDisplayName: "GPT-OSS 20B vLLM Runtime"
-    templateName: "vllm-cuda-runtime-gptoss"
+    templateName: "vllm-cuda-runtime-gptoss-hs"
   extraArgs:
-    # --chat-template dropped: was inside the old castawayegr image only.
-    # rhaiis vLLM 0.13.0 uses the model's built-in tokenizer_config.json chat template.
+    # --chat-template dropped: the path was inside the old castawayegr image only.
+    # rhaiis vLLM 0.13.0 will use the model's built-in chat template via tokenizer_config.json.
+    # If chat formatting looks wrong, add a template via ConfigMap volume mount instead.
     - --max-model-len=10000
     - --gpu-memory-utilization=0.95
 
 inference:
-  name: "reasoning-model-service"
-  displayName: "Reasoning Model Service"
+  name: "gpt-oss-20b-service"
+  displayName: "GPT-OSS 20B Service"
   scaling:
     minReplicas: 1
     maxReplicas: 1
@@ -47,4 +48,4 @@ inference:
       operator: Exists
 
 connection:
-  name: "genai2025-pull-secret"
+  name: ""

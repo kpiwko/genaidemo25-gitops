@@ -8,11 +8,11 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: https://github.com/red-hat-data-services/genaidemo25-gitops.git
-      targetRevision: HEAD
+    - repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
+      targetRevision: hs-hackathon
       path: module-lightspeed/install-pipelines
-    - repoURL: https://github.com/red-hat-data-services/genaidemo25-gitops.git
-      targetRevision: HEAD
+    - repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
+      targetRevision: hs-hackathon
       path: module-lightspeed/install-web-terminal
   destination:
     server: https://kubernetes.default.svc

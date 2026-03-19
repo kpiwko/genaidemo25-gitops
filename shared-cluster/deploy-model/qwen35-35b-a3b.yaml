@@ -1,15 +1,16 @@
 model:
-  name: "oss-gpt-20b"
-  displayName: "GPT-OSS 20B"
-  sourceUri: "oci://quay.io/castawayegr/modelcar-catalog:gpt-oss-20b"
+  name: "qwen35-35b-a3b"
+  displayName: "Qwen3.5 35B A3B (Q4_K_M GGUF)"
+  sourceUri: "oci://quay.io/dprod/qwen35-35b-a3b-q4km-modelcar:latest"
   format: "vLLM"
+  file: "Qwen3.5-35B-A3B-Q4_K_M.gguf"
 
 namespace:
   name: "genai25-deployments"
 
 runtime:
-  name: "vllm-cuda-runtime-gptoss"
-  displayName: "GPT-OSS 20B vLLM Runtime"
+  name: "vllm-cuda-runtime-qwen35-gguf"
+  displayName: "Qwen3.5 35B A3B vLLM GGUF Runtime"
   image: "registry.redhat.io/rhaiis/vllm-cuda-rhel9@sha256:ec799bb5eeb7e25b4b25a8917ab5161da6b6f1ab830cbba61bba371cffb0c34d"
   annotations:
     acceleratorName: "nvidia-gpu"
@@ -18,28 +19,26 @@ runtime:
     recommendedAccelerators: '["nvidia.com/gpu"]'
     runtimeVersion: "v0.13.0"
     servingRuntimeScope: "global"
-    templateDisplayName: "GPT-OSS 20B vLLM Runtime"
-    templateName: "vllm-cuda-runtime-gptoss"
+    templateDisplayName: "Qwen3.5 35B A3B vLLM GGUF"
+    templateName: "vllm-cuda-runtime-qwen35-gguf"
   extraArgs:
-    # --chat-template dropped: was inside the old castawayegr image only.
-    # rhaiis vLLM 0.13.0 uses the model's built-in tokenizer_config.json chat template.
-    - --max-model-len=10000
-    - --gpu-memory-utilization=0.95
+    - --gpu-memory-utilization=0.90
+    - --max-model-len=32768
 
 inference:
-  name: "reasoning-model-service"
-  displayName: "Reasoning Model Service"
+  name: "qwen35-35b-service"
+  displayName: "Qwen3.5 35B A3B Service"
   scaling:
     minReplicas: 1
     maxReplicas: 1
   resources:
     requests:
-      cpu: "4"
-      memory: "8Gi"
+      cpu: "8"
+      memory: "40Gi"
       gpu: "1"
     limits:
-      cpu: "8"
-      memory: "10Gi"
+      cpu: "16"
+      memory: "60Gi"
       gpu: "1"
   tolerations:
     - effect: NoSchedule

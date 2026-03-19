@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: llm-models
+  name: hsworkshop
   namespace: openshift-gitops
   labels:
     app.kubernetes.io/managed-by: argocd
@@ -10,30 +10,21 @@ metadata:
 spec:
   project: default
   sources:
+    # OpenWebUI, Langfuse, PostgreSQL, TrustyAI guardrails
+    - repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
+      targetRevision: hs-hackathon
+      path: module-hsworkshop/install
+    # gpt-oss-20b stopgap model (replace with Qwen3.5 values file once image is ready)
     - repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
       targetRevision: hs-hackathon
       path: shared-cluster/deploy-model
       helm:
-        releaseName: gpt-oss-20b
+        releaseName: gpt-oss-20b-hsworkshop
         valueFiles:
-          - "gpt-oss-20b.yaml"
-    - repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
-      targetRevision: hs-hackathon
-      path: shared-cluster/deploy-model
-      helm:
-        releaseName: gemma-3-27b
-        valueFiles:
-          - "gemma-3-27b.yaml"
-    - repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
-      targetRevision: hs-hackathon
-      path: shared-cluster/deploy-model
-      helm:
-        releaseName: qwen35-35b-a3b
-        valueFiles:
-          - "qwen35-35b-a3b.yaml"
+          - "gpt-oss-20b-hsworkshop.yaml"
   destination:
-    server: "https://kubernetes.default.svc"
-    namespace: "genai25-deployments"
+    server: https://kubernetes.default.svc
+    namespace: hsworkshop
   syncPolicy:
     managedNamespaceMetadata:
       labels:
@@ -43,3 +34,6 @@ spec:
       selfHeal: false
     syncOptions:
       - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+  revisionHistoryLimit: 3

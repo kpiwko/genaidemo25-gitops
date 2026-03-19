@@ -1,0 +1,101 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: openwebui-data
+  namespace: hsworkshop
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openwebui
+  namespace: hsworkshop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: openwebui
+  template:
+    metadata:
+      labels:
+        app: openwebui
+    spec:
+      serviceAccountName: hsworkshop-anyuid
+      containers:
+        - name: openwebui
+          image: ghcr.io/open-webui/open-webui:latest
+          ports:
+            - containerPort: 8080
+          env:
+            # Model backend - gpt-oss-20b InferenceService (stopgap until Qwen3.5 is ready)
+            # Update to Qwen model URL once deployed: qwen35-35b-service-hsworkshop.apps.*
+            - name: OPENAI_API_BASE_URL
+              value: "https://gpt-oss-20b-service-hsworkshop.apps.brno-hack-pool-s5z4r.aws.rh-ods.com/v1"
+            - name: OPENAI_API_KEY
+              value: "unused"
+            # Langfuse tracing - keys populated after first Langfuse deploy
+            - name: LANGFUSE_HOST
+              value: "http://langfuse:3000"
+            - name: ENABLE_OPENAI_API
+              value: "true"
+            - name: WEBUI_NAME
+              value: "HS Workshop AI"
+            # Disable Ollama since we use OpenAI-compatible endpoint only
+            - name: ENABLE_OLLAMA_API
+              value: "false"
+          envFrom:
+            - secretRef:
+                name: openwebui-secret
+          volumeMounts:
+            - name: data
+              mountPath: /app/backend/data
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: openwebui-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openwebui
+  namespace: hsworkshop
+spec:
+  selector:
+    app: openwebui
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: openwebui
+  namespace: hsworkshop
+spec:
+  host: openwebui-hsworkshop.apps.brno-hack-pool-s5z4r.aws.rh-ods.com
+  to:
+    kind: Service
+    name: openwebui
+  port:
+    targetPort: 8080
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

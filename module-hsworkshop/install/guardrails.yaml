@@ -1,0 +1,20 @@
+# TrustyAI GuardrailsOrchestrator
+#
+# Sits between OpenWebUI and the InferenceService. After deploying:
+# 1. The orchestrator exposes a gateway at port 8080
+# 2. Update OPENAI_API_BASE_URL in openwebui.yaml to point at the gateway:
+#    http://guardrails-orchestrator-guardrails.hsworkshop.svc.cluster.local:8080/v1
+# 3. All prompts flow through TrustyAI before reaching gpt-oss-20b-service
+#    Blocked prompts are logged by Langfuse (OpenWebUI logs the error response)
+apiVersion: trustyai.opendatahub.io/v1alpha1
+kind: GuardrailsOrchestrator
+metadata:
+  name: guardrails-orchestrator
+  namespace: hsworkshop
+spec:
+  autoConfig:
+    inferenceServiceToGuardrail: gpt-oss-20b-service
+    detectorServiceLabelToMatch: trustyai/guardrails-groupA
+  enableBuiltInDetectors: true
+  enableGuardrailsGateway: true
+  replicas: 1

@@ -23,7 +23,7 @@ spec:
   containers:
     - args:
         - --port=8080
-        - --model=/mnt/models
+        - --model=/mnt/models{{- if .Values.model.file }}/{{ .Values.model.file }}{{- end }}
         - --served-model-name={{`{{.Name}}`}}
       {{- with .Values.runtime.extraArgs }}
       {{- range . }}

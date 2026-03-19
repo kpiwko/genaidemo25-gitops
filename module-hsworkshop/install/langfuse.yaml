@@ -1,0 +1,108 @@
+# Langfuse v3 — web (API + UI) and worker components
+# v3 changed from a monolith to web + worker split
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langfuse-web
+  namespace: hsworkshop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: langfuse-web
+  template:
+    metadata:
+      labels:
+        app: langfuse-web
+    spec:
+      serviceAccountName: hsworkshop-anyuid
+      containers:
+        - name: langfuse-web
+          image: docker.io/langfuse/langfuse:3
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NEXTAUTH_URL
+              value: "https://langfuse-hsworkshop.apps.brno-hack-pool-s5z4r.aws.rh-ods.com"
+            - name: TELEMETRY_ENABLED
+              value: "false"
+            - name: LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES
+              value: "true"
+          envFrom:
+            - secretRef:
+                name: langfuse-secret
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          readinessProbe:
+            httpGet:
+              path: /api/public/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langfuse-worker
+  namespace: hsworkshop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: langfuse-worker
+  template:
+    metadata:
+      labels:
+        app: langfuse-worker
+    spec:
+      serviceAccountName: hsworkshop-anyuid
+      containers:
+        - name: langfuse-worker
+          image: docker.io/langfuse/langfuse-worker:3
+          env:
+            - name: TELEMETRY_ENABLED
+              value: "false"
+          envFrom:
+            - secretRef:
+                name: langfuse-secret
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse
+  namespace: hsworkshop
+spec:
+  selector:
+    app: langfuse-web
+  ports:
+    - port: 3000
+      targetPort: 3000
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: langfuse
+  namespace: hsworkshop
+spec:
+  host: langfuse-hsworkshop.apps.brno-hack-pool-s5z4r.aws.rh-ods.com
+  to:
+    kind: Service
+    name: langfuse
+  port:
+    targetPort: 3000
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
