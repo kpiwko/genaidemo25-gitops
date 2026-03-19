@@ -7,7 +7,7 @@ metadata:
   annotations:
     opendatahub.io/accelerator-name: {{ .Values.runtime.annotations.acceleratorName }}
     opendatahub.io/apiProtocol: {{ .Values.runtime.annotations.apiProtocol }}
-    opendatahub.io/hardware-profile-name: {{ .Values.runtime.annotations.hardwareProfileName }}
+    opendatahub.io/hardware-profile-name: {{ .Values.runtime.annotations.hardwareProfileName | quote }}
     opendatahub.io/recommended-accelerators: {{ .Values.runtime.annotations.recommendedAccelerators | quote }}
     opendatahub.io/runtime-version: {{ .Values.runtime.annotations.runtimeVersion }}
     opendatahub.io/serving-runtime-scope: {{ .Values.runtime.annotations.servingRuntimeScope }}
