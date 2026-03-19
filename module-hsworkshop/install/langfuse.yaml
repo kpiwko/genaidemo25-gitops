@@ -72,6 +72,8 @@ spec:
               value: "false"
             - name: CLICKHOUSE_CLUSTER_ENABLED
               value: "false"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_ENABLED
+              value: "false"
           envFrom:
             - secretRef:
                 name: langfuse-secret
