@@ -29,6 +29,8 @@ spec:
               value: "false"
             - name: LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES
               value: "true"
+            - name: CLICKHOUSE_CLUSTER_ENABLED
+              value: "false"
           envFrom:
             - secretRef:
                 name: langfuse-secret
@@ -67,6 +69,8 @@ spec:
           image: docker.io/langfuse/langfuse-worker:3
           env:
             - name: TELEMETRY_ENABLED
+              value: "false"
+            - name: CLICKHOUSE_CLUSTER_ENABLED
               value: "false"
           envFrom:
             - secretRef:
