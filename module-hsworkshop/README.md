@@ -5,14 +5,16 @@ OpenWebUI + Langfuse v3 + TrustyAI GuardrailsOrchestrator running in the `hswork
 ## Architecture
 
 ```
-User → OpenWebUI → KServe InferenceService (vLLM)
-                 ↘ Langfuse (tracing)
-                      ↳ Web API → MinIO → Worker → ClickHouse
+User → OpenWebUI → Pipelines (filter) → KServe InferenceService (vLLM)
+                       ↓
+                   Langfuse (tracing)
+                       ↳ Web API → MinIO → Worker → ClickHouse
 ```
 
 | Component | Purpose |
 |-----------|---------|
 | OpenWebUI | Chat UI with OpenAI-compatible backend |
+| Pipelines | Filter layer enabling Langfuse tracing in OpenWebUI |
 | Langfuse | LLM observability: traces, costs, latency |
 | vLLM / KServe | Model serving (gpt-oss-20b or Qwen3.5) |
 | PostgreSQL | Relational data for Langfuse |
@@ -108,8 +110,8 @@ oc get pods -n hsworkshop
 # Model should be READY=True
 oc get inferenceservice -n hsworkshop
 
-# Quick model health check
-curl -s http://gpt-oss-20b-service-predictor.hsworkshop.svc.cluster.local/health
+# Quick model health check (note: predictor service uses port 8080)
+curl -s http://gpt-oss-20b-service-predictor.hsworkshop.svc.cluster.local:8080/v1/models
 ```
 
 ## Updating the model
@@ -130,10 +132,10 @@ oc get pods -n hsworkshop -l serving.kserve.io/inferenceservice=gpt-oss-20b-serv
 oc logs -n hsworkshop -l serving.kserve.io/inferenceservice=gpt-oss-20b-service -c kserve-container
 ```
 
-**Langfuse traces not appearing** — check the OpenWebUI secret has real (non-placeholder) Langfuse keys:
-```bash
-oc get secret openwebui-secret -n hsworkshop -o jsonpath='{.data.LANGFUSE_PUBLIC_KEY}' | base64 -d
-```
+**Langfuse traces not appearing** — tracing goes through the Pipelines service. Check:
+- Pipelines pod is Running: `oc get pods -n hsworkshop -l app=pipelines`
+- OpenWebUI is connected to Pipelines: Admin Panel → Settings → Connections → `http://pipelines:9099`
+- Langfuse filter pipeline is installed and configured with correct host/keys: Admin Panel → Settings → Pipelines
 
 **Langfuse worker crashing** — check logs and MinIO connectivity:
 ```bash
