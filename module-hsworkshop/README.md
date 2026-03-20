@@ -59,9 +59,12 @@ oc annotate application.argoproj.io hsworkshop -n openshift-gitops \
 ### 3. Create OpenWebUI admin account
 
 1. Open https://openwebui-hsworkshop.apps.brno-hack-pool-s5z4r.aws.rh-ods.com
-2. Click **Sign up** — the first registered user becomes admin
+2. Click **Sign up** — the first registered user becomes admin automatically
 3. Fill in name, email, password and register
-4. You should see the chat interface with the model available in the top dropdown
+
+Subsequent users can self-register and get immediate access (`DEFAULT_USER_ROLE=user` is set in `openwebui.yaml`).
+
+> **Note:** If you're updating an existing install rather than a fresh one, the signup setting may already be stored in the database with a different value. In that case enable it manually: Admin Panel → Settings → General → Enable New User Sign Up → on.
 
 ### 4. Set up Langfuse
 
@@ -110,8 +113,9 @@ oc get pods -n hsworkshop
 # Model should be READY=True
 oc get inferenceservice -n hsworkshop
 
-# Quick model health check (note: predictor service uses port 8080)
-curl -s http://gpt-oss-20b-service-predictor.hsworkshop.svc.cluster.local:8080/v1/models
+# Quick model health check (run from inside the cluster, e.g. via oc exec)
+oc exec -n hsworkshop deployment/openwebui -- \
+  curl -s http://gpt-oss-20b-service-predictor.hsworkshop.svc.cluster.local:8080/v1/models
 ```
 
 ## Updating the model
@@ -148,4 +152,14 @@ oc get pods -n hsworkshop -l app=minio
 oc patch application.argoproj.io hsworkshop -n openshift-gitops \
   --type=json -p='[{"op":"remove","path":"/operation"}]'
 ```
-Then trigger a fresh sync from the UI.
+Then do a hard refresh and trigger a fresh sync from the UI:
+```bash
+oc annotate application.argoproj.io hsworkshop -n openshift-gitops \
+  argocd.argoproj.io/refresh=hard --overwrite
+```
+
+**Model pod stuck Pending after rolling update** — KServe rolling updates can deadlock when only one GPU is available: the new pod can't schedule until the old one is gone, but the old one won't terminate until the new one is ready. Fix by deleting the old pod manually:
+```bash
+oc get pods -n hsworkshop -l serving.kserve.io/inferenceservice=gpt-oss-20b-service
+oc delete pod -n hsworkshop <old-predictor-pod-name>
+```
