@@ -1,0 +1,69 @@
+# OpenWebUI Pipelines — filter/transform layer enabling Langfuse tracing
+# Connect OpenWebUI to this service via Admin Panel > Settings > Connections
+# URL: http://pipelines:9099  API Key: 0p3n-w3bu!
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pipelines-data
+  namespace: hsworkshop
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pipelines
+  namespace: hsworkshop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pipelines
+  template:
+    metadata:
+      labels:
+        app: pipelines
+    spec:
+      serviceAccountName: hsworkshop-anyuid
+      containers:
+        - name: pipelines
+          image: ghcr.io/open-webui/pipelines:main
+          ports:
+            - containerPort: 9099
+          volumeMounts:
+            - name: data
+              mountPath: /app/pipelines
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 9099
+            initialDelaySeconds: 15
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: pipelines-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pipelines
+  namespace: hsworkshop
+spec:
+  selector:
+    app: pipelines
+  ports:
+    - port: 9099
+      targetPort: 9099

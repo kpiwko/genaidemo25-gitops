@@ -75,24 +75,29 @@ oc annotate application.argoproj.io hsworkshop -n openshift-gitops \
 2. Click **Create new API key**
 3. Copy the **Public Key** (`pk-lf-...`) and **Secret Key** (`sk-lf-...`) — the secret is only shown once
 
-#### 4c. Wire Langfuse keys into OpenWebUI
+#### 4c. Connect OpenWebUI to Pipelines
 
-```bash
-oc patch secret openwebui-secret -n hsworkshop \
-  --type=merge \
-  --patch='{"stringData":{
-    "LANGFUSE_PUBLIC_KEY":"pk-lf-REPLACE_ME",
-    "LANGFUSE_SECRET_KEY":"sk-lf-REPLACE_ME"
-  }}'
-```
+Langfuse tracing in OpenWebUI works via the **Pipelines** service (a filter layer). The `pipelines` pod is deployed alongside the stack.
 
-Then restart OpenWebUI to pick up the new keys:
+In OpenWebUI Admin Panel:
+1. Go to **Settings → Connections**
+2. Add a new OpenAI API connection:
+   - **URL**: `http://pipelines:9099`
+   - **API Key**: `0p3n-w3bu!`
+3. Save
 
-```bash
-oc rollout restart deployment openwebui -n hsworkshop
-```
+#### 4d. Install the Langfuse filter pipeline
 
-After restart, conversations in OpenWebUI will appear as traces in the Langfuse UI under your project.
+1. Go to **Admin Panel → Settings → Pipelines**
+2. Click **Install from GitHub URL** and enter:
+   ```
+   https://github.com/open-webui/pipelines/blob/main/examples/filters/langfuse_v3_filter_pipeline.py
+   ```
+3. Once installed, open the pipeline settings and enter your Langfuse keys:
+   - **Langfuse Public Key**: `pk-lf-...`
+   - **Langfuse Secret Key**: `sk-lf-...`
+   - **Langfuse Host**: `http://langfuse:3000`
+4. Save — conversations will now appear as traces in Langfuse
 
 ## Verifying the stack
 

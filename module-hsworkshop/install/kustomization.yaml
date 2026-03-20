@@ -9,5 +9,6 @@ resources:
   - clickhouse.yaml
   - minio.yaml
   - langfuse.yaml
+  - pipelines.yaml
   - openwebui.yaml
   - guardrails.yaml
