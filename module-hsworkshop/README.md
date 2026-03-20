@@ -56,15 +56,16 @@ oc annotate application.argoproj.io hsworkshop -n openshift-gitops \
   argocd.argoproj.io/refresh=hard --overwrite
 ```
 
-### 3. Create OpenWebUI admin account
+### 3. Log in to OpenWebUI
+
+The admin account is created automatically on first boot using `WEBUI_ADMIN_EMAIL` and `WEBUI_ADMIN_PASSWORD` from `openwebui-secret` (set by `apply-secrets.sh`).
 
 1. Open https://openwebui-hsworkshop.apps.brno-hack-pool-s5z4r.aws.rh-ods.com
-2. Click **Sign up** — the first registered user becomes admin automatically
-3. Fill in name, email, password and register
+2. Log in with the email and password you saved in your password manager
 
-Subsequent users can self-register and get immediate access (`DEFAULT_USER_ROLE=user` is set in `openwebui.yaml`).
+Subsequent users can self-register and get immediate access — `DEFAULT_USER_ROLE=user` and `ENABLE_SIGNUP=true` are set in `openwebui.yaml`.
 
-> **Note:** If you're updating an existing install rather than a fresh one, the signup setting may already be stored in the database with a different value. In that case enable it manually: Admin Panel → Settings → General → Enable New User Sign Up → on.
+> **Note:** If updating an existing install, the signup setting may already be stored in the database. Enable it manually if needed: Admin Panel → Settings → General → Enable New User Sign Up → on.
 
 ### 4. Set up Langfuse
 

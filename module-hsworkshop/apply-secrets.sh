@@ -15,18 +15,24 @@ ENCRYPTION_KEY=$(openssl rand -hex 32)
 WEBUI_SECRET_KEY=$(openssl rand -base64 32)
 MINIO_ROOT_USER="langfuse"
 MINIO_ROOT_PASSWORD=$(openssl rand -hex 24)
+WEBUI_ADMIN_PASSWORD=$(openssl rand -hex 16)
+
+read -r -p "Enter OpenWebUI admin email [admin@hsworkshop.local]: " WEBUI_ADMIN_EMAIL
+WEBUI_ADMIN_EMAIL="${WEBUI_ADMIN_EMAIL:-admin@hsworkshop.local}"
 
 echo "========================================="
 echo "  Save these in your password manager!   "
 echo "========================================="
-echo "POSTGRES_PASS:       $POSTGRES_PASS"
-echo "CH_PASS:             $CH_PASS"
-echo "NEXTAUTH_SECRET:     $NEXTAUTH_SECRET"
-echo "SALT:                $SALT"
-echo "ENCRYPTION_KEY:      $ENCRYPTION_KEY"
-echo "WEBUI_SECRET_KEY:    $WEBUI_SECRET_KEY"
-echo "MINIO_ROOT_USER:     $MINIO_ROOT_USER"
-echo "MINIO_ROOT_PASSWORD: $MINIO_ROOT_PASSWORD"
+echo "POSTGRES_PASS:        $POSTGRES_PASS"
+echo "CH_PASS:              $CH_PASS"
+echo "NEXTAUTH_SECRET:      $NEXTAUTH_SECRET"
+echo "SALT:                 $SALT"
+echo "ENCRYPTION_KEY:       $ENCRYPTION_KEY"
+echo "WEBUI_SECRET_KEY:     $WEBUI_SECRET_KEY"
+echo "MINIO_ROOT_USER:      $MINIO_ROOT_USER"
+echo "MINIO_ROOT_PASSWORD:  $MINIO_ROOT_PASSWORD"
+echo "WEBUI_ADMIN_EMAIL:    $WEBUI_ADMIN_EMAIL"
+echo "WEBUI_ADMIN_PASSWORD: $WEBUI_ADMIN_PASSWORD"
 echo "========================================="
 read -r -p "Press Enter once saved to continue applying secrets..."
 
@@ -60,6 +66,8 @@ oc create secret generic minio-secret -n hsworkshop \
 
 oc create secret generic openwebui-secret -n hsworkshop \
   --from-literal=WEBUI_SECRET_KEY="$WEBUI_SECRET_KEY" \
+  --from-literal=WEBUI_ADMIN_EMAIL="$WEBUI_ADMIN_EMAIL" \
+  --from-literal=WEBUI_ADMIN_PASSWORD="$WEBUI_ADMIN_PASSWORD" \
   --from-literal=LANGFUSE_PUBLIC_KEY="pk-lf-placeholder" \
   --from-literal=LANGFUSE_SECRET_KEY="sk-lf-placeholder"
 
