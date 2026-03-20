@@ -35,7 +35,7 @@ spec:
             # Model backend - gpt-oss-20b InferenceService via internal cluster service
             # RawDeployment mode exposes via ClusterIP service, not a Route
             - name: OPENAI_API_BASE_URL
-              value: "http://gpt-oss-20b-service-predictor.hsworkshop.svc.cluster.local/v1"
+              value: "http://gpt-oss-20b-service-predictor.hsworkshop.svc.cluster.local:8080/v1"
             - name: OPENAI_API_KEY
               value: "unused"
             # Langfuse tracing - keys populated after first Langfuse deploy
