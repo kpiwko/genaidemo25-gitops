@@ -14,14 +14,14 @@ spec:
     - repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
       targetRevision: hs-hackathon
       path: module-hsworkshop/install
-    # gpt-oss-20b stopgap model (replace with Qwen3.5 values file once image is ready)
+    # Qwen3.5 35B A3B Q4_K_M GGUF model
     - repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
       targetRevision: hs-hackathon
       path: shared-cluster/deploy-model
       helm:
-        releaseName: gpt-oss-20b-hsworkshop
+        releaseName: qwen35-35b-hsworkshop
         valueFiles:
-          - "gpt-oss-20b-hsworkshop.yaml"
+          - "qwen35-35b-a3b-hsworkshop.yaml"
   destination:
     server: https://kubernetes.default.svc
     namespace: hsworkshop
