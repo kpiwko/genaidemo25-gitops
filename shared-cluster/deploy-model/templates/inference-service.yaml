@@ -6,10 +6,7 @@ metadata:
   namespace: {{ .Values.namespace.name }}
   annotations:
     openshift.io/display-name: {{ .Values.inference.displayName }}
-    serving.knative.openshift.io/enablePassthrough: "true"
-    serving.kserve.io/deploymentMode: Serverless
-    sidecar.istio.io/inject: "true"
-    sidecar.istio.io/rewriteAppHTTPProbers: "true"
+    serving.kserve.io/deploymentMode: RawDeployment
   labels:
     opendatahub.io/dashboard: "true"
 spec:
