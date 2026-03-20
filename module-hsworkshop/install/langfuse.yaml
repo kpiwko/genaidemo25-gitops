@@ -31,6 +31,26 @@ spec:
               value: "true"
             - name: CLICKHOUSE_CLUSTER_ENABLED
               value: "false"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_ENABLED
+              value: "true"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
+              value: "langfuse-events"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_REGION
+              value: "us-east-1"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
+              value: "http://minio:9000"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
+              value: "true"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: MINIO_ROOT_USER
+            - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: MINIO_ROOT_PASSWORD
           envFrom:
             - secretRef:
                 name: langfuse-secret
@@ -73,7 +93,25 @@ spec:
             - name: CLICKHOUSE_CLUSTER_ENABLED
               value: "false"
             - name: LANGFUSE_S3_EVENT_UPLOAD_ENABLED
-              value: "false"
+              value: "true"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
+              value: "langfuse-events"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_REGION
+              value: "us-east-1"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
+              value: "http://minio:9000"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
+              value: "true"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: MINIO_ROOT_USER
+            - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: MINIO_ROOT_PASSWORD
           envFrom:
             - secretRef:
                 name: langfuse-secret

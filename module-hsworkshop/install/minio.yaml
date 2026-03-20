@@ -1,0 +1,123 @@
+# MinIO — self-hosted S3-compatible blob storage for Langfuse event ingestion
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-data
+  namespace: hsworkshop
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  namespace: hsworkshop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      serviceAccountName: hsworkshop-anyuid
+      containers:
+        - name: minio
+          image: docker.io/minio/minio:latest
+          args: ["server", "/data", "--console-address", ":9001"]
+          ports:
+            - containerPort: 9000
+              name: api
+            - containerPort: 9001
+              name: console
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: MINIO_ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: MINIO_ROOT_PASSWORD
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: minio-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: hsworkshop
+spec:
+  selector:
+    app: minio
+  ports:
+    - name: api
+      port: 9000
+      targetPort: 9000
+    - name: console
+      port: 9001
+      targetPort: 9001
+---
+# Job to create the langfuse-events bucket on first deploy
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-create-bucket
+  namespace: hsworkshop
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  template:
+    spec:
+      serviceAccountName: hsworkshop-anyuid
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: docker.io/minio/mc:latest
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              until mc alias set minio http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"; do
+                echo "Waiting for MinIO..."; sleep 3;
+              done
+              mc mb --ignore-existing minio/langfuse-events
+              echo "Bucket ready."
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: MINIO_ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: MINIO_ROOT_PASSWORD
