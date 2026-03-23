@@ -39,7 +39,15 @@ data:
         return {k: v for k, v in source_headers.items()
                 if k.lower() in PASSTHROUGH_HEADERS}
 
-    def _json_response(model):
+    def _is_blocked(data: dict) -> bool:
+        choices  = data.get("choices", None)
+        warnings = data.get("warnings") or []
+        return (
+            isinstance(choices, list) and len(choices) == 0
+            and any(w.get("type") == "UNSUITABLE_INPUT" for w in warnings)
+        )
+
+    def _json_response(model: str) -> bytes:
         return json.dumps({
             "id": "chatcmpl-blocked",
             "object": "chat.completion",
@@ -53,20 +61,23 @@ data:
             "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
         }).encode()
 
-    def _sse_response(model):
-        chunk = json.dumps({
-            "id": "chatcmpl-blocked",
-            "object": "chat.completion.chunk",
+    def _sse_response(model: str) -> bytes:
+        # Two-chunk SSE: content first, then stop signal, then [DONE]
+        c1 = json.dumps({
+            "id": "chatcmpl-blocked", "object": "chat.completion.chunk",
             "model": model,
-            "choices": [{
-                "index": 0,
-                "delta": {"role": "assistant", "content": BLOCKED_CONTENT},
-                "finish_reason": "stop",
-            }],
+            "choices": [{"index": 0, "delta": {"role": "assistant", "content": BLOCKED_CONTENT}, "finish_reason": None}],
         })
-        return f"data: {chunk}\n\ndata: [DONE]\n\n".encode()
+        c2 = json.dumps({
+            "id": "chatcmpl-blocked", "object": "chat.completion.chunk",
+            "model": model,
+            "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+        })
+        return f"data: {c1}\n\ndata: {c2}\n\ndata: [DONE]\n\n".encode()
 
     class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
         def _relay(self, target, body=None, method=None):
             method = method or self.command
             headers = _forward_headers(self.headers)
@@ -76,28 +87,53 @@ data:
             except urllib.error.HTTPError as e:
                 return e
 
-        def _send_response(self, status, content_type, body):
+        def _send_body(self, status, content_type, body: bytes):
             self.send_response(status)
             self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Connection", "keep-alive")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def _send_sse(self, body: bytes):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
 
+        def _stream_through(self, resp):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Transfer-Encoding", "chunked")
+            self.end_headers()
+            while True:
+                chunk = resp.read(4096)
+                if not chunk:
+                    break
+                self.wfile.write(chunk)
+                self.wfile.flush()
+
         def do_GET(self):
             resp = self._relay(f"{PREDICTOR}{self.path}")
             body = resp.read()
-            ct = resp.headers.get("Content-Type", "application/json")
-            self._send_response(resp.status if hasattr(resp, "status") else resp.code, ct, body)
+            ct   = resp.headers.get("Content-Type", "application/json")
+            code = resp.status if hasattr(resp, "status") else resp.code
+            self._send_body(code, ct, body)
 
         def do_POST(self):
             length = int(self.headers.get("Content-Length", 0))
-            raw = self.rfile.read(length)
+            raw    = self.rfile.read(length)
 
             if self.path != "/v1/chat/completions":
                 resp = self._relay(f"{PREDICTOR}{self.path}", body=raw)
                 body = resp.read()
-                ct = resp.headers.get("Content-Type", "application/json")
-                self._send_response(resp.status if hasattr(resp, "status") else resp.code, ct, body)
+                ct   = resp.headers.get("Content-Type", "application/json")
+                code = resp.status if hasattr(resp, "status") else resp.code
+                self._send_body(code, ct, body)
                 return
 
             try:
@@ -111,40 +147,60 @@ data:
             ct   = resp.headers.get("Content-Type", "application/json")
 
             if "text/event-stream" in ct:
-                # Non-blocked streaming response — pass through chunk by chunk
-                self.send_response(200)
-                self.send_header("Content-Type", "text/event-stream")
-                self.send_header("Cache-Control", "no-cache")
-                self.end_headers()
-                while True:
-                    chunk = resp.read(4096)
+                # Read first SSE event to detect a blocked streaming response.
+                # TrustyAI returns a single SSE chunk with choices:[] for blocked prompts.
+                buf = b""
+                while b"\n\n" not in buf:
+                    chunk = resp.read(256)
                     if not chunk:
                         break
-                    self.wfile.write(chunk)
-                    self.wfile.flush()
+                    buf += chunk
+
+                blocked = False
+                for line in buf.split(b"\n"):
+                    if line.startswith(b"data: ") and line != b"data: [DONE]":
+                        try:
+                            blocked = _is_blocked(json.loads(line[6:]))
+                        except Exception:
+                            pass
+
+                if blocked:
+                    self._send_sse(_sse_response(model))
+                else:
+                    # Not blocked — forward buffered data then stream the rest
+                    self._stream_through_with_prefix(buf, resp)
                 return
 
             # Non-streaming response — check if blocked
             body = resp.read()
             blocked = False
             try:
-                rj = json.loads(body)
-                choices  = rj.get("choices", None)
-                warnings = rj.get("warnings") or []
-                blocked  = (
-                    isinstance(choices, list) and len(choices) == 0
-                    and any(w.get("type") == "UNSUITABLE_INPUT" for w in warnings)
-                )
+                blocked = _is_blocked(json.loads(body))
             except Exception:
                 pass
 
             if blocked:
                 if stream:
-                    self._send_response(200, "text/event-stream", _sse_response(model))
+                    self._send_sse(_sse_response(model))
                 else:
-                    self._send_response(200, "application/json", _json_response(model))
+                    self._send_body(200, "application/json", _json_response(model))
             else:
-                self._send_response(200, ct, body)
+                self._send_body(200, ct, body)
+
+        def _stream_through_with_prefix(self, prefix: bytes, resp):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Transfer-Encoding", "chunked")
+            self.end_headers()
+            self.wfile.write(prefix)
+            self.wfile.flush()
+            while True:
+                chunk = resp.read(4096)
+                if not chunk:
+                    break
+                self.wfile.write(chunk)
+                self.wfile.flush()
 
         def log_message(self, fmt, *args):
             print(fmt % args, flush=True)
