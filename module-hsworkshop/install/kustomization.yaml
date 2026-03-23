@@ -11,5 +11,6 @@ resources:
   - langfuse.yaml
   - pipelines.yaml
   - searxng.yaml
+  - profanity-detector.yaml
   - openwebui.yaml
   - guardrails.yaml

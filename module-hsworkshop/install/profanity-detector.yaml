@@ -1,0 +1,97 @@
+# Guardrails proxy for OpenWebUI → TrustyAI GuardrailsOrchestrator integration
+#
+# The TrustyAI gateway uses route-prefixed URLs (/all/v1/chat/completions) that
+# OpenWebUI doesn't natively support, and it doesn't proxy /v1/models for model listing.
+# This nginx proxy bridges the gap:
+#   - /v1/chat/completions  → guardrails gateway (with profanity detection)
+#   - /v1/*                 → predictor directly (model listing, health, etc.)
+#
+# OpenWebUI OPENAI_API_BASE_URL: http://guardrails-proxy.hsworkshop.svc.cluster.local:8080/v1
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: guardrails-proxy-config
+  namespace: hsworkshop
+data:
+  nginx.conf: |
+    events {
+      worker_processes 1;
+    }
+    http {
+      server {
+        listen 8080;
+
+        # Chat completions go through guardrails (adds /all/ route prefix)
+        location = /v1/chat/completions {
+          proxy_pass http://guardrails-orchestrator-service.hsworkshop.svc.cluster.local:8090/all/v1/chat/completions;
+          proxy_pass_request_headers on;
+          proxy_read_timeout 120s;
+          proxy_connect_timeout 10s;
+          proxy_set_header Host $host;
+        }
+
+        # Everything else (model listing, health) goes directly to the predictor
+        location /v1/ {
+          proxy_pass http://gpt-oss-20b-service-predictor.hsworkshop.svc.cluster.local:8080/v1/;
+          proxy_pass_request_headers on;
+          proxy_read_timeout 60s;
+          proxy_connect_timeout 10s;
+          proxy_set_header Host $host;
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: guardrails-proxy
+  namespace: hsworkshop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: guardrails-proxy
+  template:
+    metadata:
+      labels:
+        app: guardrails-proxy
+    spec:
+      serviceAccountName: hsworkshop-anyuid
+      containers:
+        - name: nginx
+          image: docker.io/library/nginx:stable-alpine
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+          readinessProbe:
+            httpGet:
+              path: /v1/models
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: guardrails-proxy-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: guardrails-proxy
+  namespace: hsworkshop
+spec:
+  selector:
+    app: guardrails-proxy
+  ports:
+    - port: 8080
+      targetPort: 8080
