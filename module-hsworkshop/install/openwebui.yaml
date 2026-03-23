@@ -48,6 +48,8 @@ spec:
             # Disable Ollama since we use OpenAI-compatible endpoint only
             - name: ENABLE_OLLAMA_API
               value: "false"
+            - name: ENABLE_EVALUATION_ARENA_MODELS
+              value: "false"
             - name: ENABLE_SIGNUP
               value: "true"
             - name: DEFAULT_USER_ROLE
