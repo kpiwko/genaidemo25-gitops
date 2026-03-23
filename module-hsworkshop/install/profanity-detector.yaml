@@ -1,10 +1,10 @@
 # Guardrails proxy for OpenWebUI → TrustyAI GuardrailsOrchestrator integration
 #
-# The TrustyAI gateway uses route-prefixed URLs (/all/v1/chat/completions) that
-# OpenWebUI doesn't natively support, and it doesn't proxy /v1/models for model listing.
-# This nginx proxy bridges the gap:
-#   - /v1/chat/completions  → guardrails gateway (with profanity detection)
-#   - /v1/*                 → predictor directly (model listing, health, etc.)
+# Routes /v1/chat/completions through the TrustyAI guardrails gateway.
+# When the gateway blocks a prompt (UNSUITABLE_INPUT), converts the empty
+# choices response into a proper assistant message so OpenWebUI shows a
+# friendly bilingual message and the conversation can continue normally.
+# All other endpoints (/v1/models, etc.) are forwarded directly to the predictor.
 #
 # OpenWebUI OPENAI_API_BASE_URL: http://guardrails-proxy.hsworkshop.svc.cluster.local:8080/v1
 apiVersion: v1
@@ -13,28 +13,145 @@ metadata:
   name: guardrails-proxy-config
   namespace: hsworkshop
 data:
-  default.conf: |
-    server {
-      listen 8080;
+  proxy.py: |
+    #!/usr/bin/env python3
+    import json
+    import urllib.request
+    import urllib.error
+    from http.server import HTTPServer, BaseHTTPRequestHandler
 
-      # Chat completions go through guardrails (adds /all/ route prefix)
-      location = /v1/chat/completions {
-        proxy_pass http://guardrails-orchestrator-service.hsworkshop.svc.cluster.local:8090/all/v1/chat/completions;
-        proxy_pass_request_headers on;
-        proxy_read_timeout 120s;
-        proxy_connect_timeout 10s;
-        proxy_set_header Host $host;
-      }
+    GUARDRAILS = "http://guardrails-orchestrator-service.hsworkshop.svc.cluster.local:8090/all"
+    PREDICTOR  = "http://gpt-oss-20b-service-predictor.hsworkshop.svc.cluster.local:8080"
 
-      # Everything else (model listing, health) goes directly to the predictor
-      location /v1/ {
-        proxy_pass http://gpt-oss-20b-service-predictor.hsworkshop.svc.cluster.local:8080/v1/;
-        proxy_pass_request_headers on;
-        proxy_read_timeout 60s;
-        proxy_connect_timeout 10s;
-        proxy_set_header Host $host;
-      }
-    }
+    MSG_EN = (
+        "\u26a0\ufe0f Your message was blocked because it contained inappropriate language. "
+        "Please rephrase your question without swear words."
+    )
+    MSG_CS = (
+        "\u26a0\ufe0f V\u00e1\u0161 dotaz byl zablokov\u00e1n, proto\u017ee obsahoval nevhodn\u00fd v\u00fdraz. "
+        "Zkuste ho p\u0159eformulovat bez vulgarit."
+    )
+    BLOCKED_CONTENT = f"{MSG_EN}\n\n{MSG_CS}"
+
+    PASSTHROUGH_HEADERS = {"authorization", "content-type", "accept"}
+
+    def _forward_headers(source_headers):
+        return {k: v for k, v in source_headers.items()
+                if k.lower() in PASSTHROUGH_HEADERS}
+
+    def _json_response(model):
+        return json.dumps({
+            "id": "chatcmpl-blocked",
+            "object": "chat.completion",
+            "model": model,
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant", "content": BLOCKED_CONTENT},
+                "finish_reason": "stop",
+                "logprobs": None,
+            }],
+            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        }).encode()
+
+    def _sse_response(model):
+        chunk = json.dumps({
+            "id": "chatcmpl-blocked",
+            "object": "chat.completion.chunk",
+            "model": model,
+            "choices": [{
+                "index": 0,
+                "delta": {"role": "assistant", "content": BLOCKED_CONTENT},
+                "finish_reason": "stop",
+            }],
+        })
+        return f"data: {chunk}\n\ndata: [DONE]\n\n".encode()
+
+    class Handler(BaseHTTPRequestHandler):
+        def _relay(self, target, body=None, method=None):
+            method = method or self.command
+            headers = _forward_headers(self.headers)
+            req = urllib.request.Request(target, data=body, headers=headers, method=method)
+            try:
+                return urllib.request.urlopen(req, timeout=120)
+            except urllib.error.HTTPError as e:
+                return e
+
+        def _send_response(self, status, content_type, body):
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_GET(self):
+            resp = self._relay(f"{PREDICTOR}{self.path}")
+            body = resp.read()
+            ct = resp.headers.get("Content-Type", "application/json")
+            self._send_response(resp.status if hasattr(resp, "status") else resp.code, ct, body)
+
+        def do_POST(self):
+            length = int(self.headers.get("Content-Length", 0))
+            raw = self.rfile.read(length)
+
+            if self.path != "/v1/chat/completions":
+                resp = self._relay(f"{PREDICTOR}{self.path}", body=raw)
+                body = resp.read()
+                ct = resp.headers.get("Content-Type", "application/json")
+                self._send_response(resp.status if hasattr(resp, "status") else resp.code, ct, body)
+                return
+
+            try:
+                req_body = json.loads(raw)
+            except Exception:
+                req_body = {}
+            stream = req_body.get("stream", False)
+            model  = req_body.get("model", "")
+
+            resp = self._relay(f"{GUARDRAILS}{self.path}", body=raw)
+            ct   = resp.headers.get("Content-Type", "application/json")
+
+            if "text/event-stream" in ct:
+                # Non-blocked streaming response — pass through chunk by chunk
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                while True:
+                    chunk = resp.read(4096)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    self.wfile.flush()
+                return
+
+            # Non-streaming response — check if blocked
+            body = resp.read()
+            blocked = False
+            try:
+                rj = json.loads(body)
+                choices  = rj.get("choices", None)
+                warnings = rj.get("warnings") or []
+                blocked  = (
+                    isinstance(choices, list) and len(choices) == 0
+                    and any(w.get("type") == "UNSUITABLE_INPUT" for w in warnings)
+                )
+            except Exception:
+                pass
+
+            if blocked:
+                if stream:
+                    self._send_response(200, "text/event-stream", _sse_response(model))
+                else:
+                    self._send_response(200, "application/json", _json_response(model))
+            else:
+                self._send_response(200, ct, body)
+
+        def log_message(self, fmt, *args):
+            print(fmt % args, flush=True)
+
+    if __name__ == "__main__":
+        print("Guardrails proxy listening on :8080", flush=True)
+        HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -53,21 +170,21 @@ spec:
     spec:
       serviceAccountName: hsworkshop-anyuid
       containers:
-        - name: nginx
-          image: docker.io/library/nginx:stable-alpine
+        - name: proxy
+          image: docker.io/library/python:3.11-slim
+          command: ["python3", "/app/proxy.py"]
           ports:
             - containerPort: 8080
           volumeMounts:
             - name: config
-              mountPath: /etc/nginx/conf.d/default.conf
-              subPath: default.conf
+              mountPath: /app
           resources:
             requests:
-              cpu: "50m"
-              memory: "64Mi"
-            limits:
-              cpu: "200m"
+              cpu: "100m"
               memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
           readinessProbe:
             httpGet:
               path: /v1/models
@@ -78,9 +195,6 @@ spec:
         - name: config
           configMap:
             name: guardrails-proxy-config
-            items:
-              - key: default.conf
-                path: default.conf
 ---
 apiVersion: v1
 kind: Service
