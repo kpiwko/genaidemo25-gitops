@@ -12,5 +12,4 @@ resources:
   - pipelines.yaml
   - searxng.yaml
   - openwebui.yaml
-  - openwebui-presets.yaml
   - guardrails.yaml
