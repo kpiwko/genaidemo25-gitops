@@ -32,10 +32,10 @@ spec:
           ports:
             - containerPort: 8080
           env:
-            # Model backend - Qwen3.5 35B A3B InferenceService via internal cluster service
+            # Model backend - GPT-OSS 20B InferenceService via internal cluster service
             # RawDeployment mode exposes via ClusterIP service, not a Route
             - name: OPENAI_API_BASE_URL
-              value: "http://qwen35-35b-service-predictor.hsworkshop.svc.cluster.local:8080/v1"
+              value: "http://gpt-oss-20b-service-predictor.hsworkshop.svc.cluster.local:8080/v1"
             - name: OPENAI_API_KEY
               value: "unused"
             # Langfuse tracing - keys populated after first Langfuse deploy
