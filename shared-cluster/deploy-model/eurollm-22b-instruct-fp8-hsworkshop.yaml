@@ -24,6 +24,9 @@ runtime:
   extraArgs:
     - --gpu-memory-utilization=0.95
     - --max-model-len=32768
+    # tokenizer.model absent from modelcar (only tokenizer.json present);
+    # mistral mode uses mistral-common which loads from tokenizer.json directly
+    - --tokenizer-mode=mistral
 
 inference:
   name: "eurollm-22b-service"
