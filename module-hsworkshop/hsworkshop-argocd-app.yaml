@@ -14,14 +14,14 @@ spec:
     - repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
       targetRevision: hs-hackathon
       path: module-hsworkshop/install
-    # GPT-OSS 20B model
+    # EuroLLM 22B Instruct FP8 model
     - repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
       targetRevision: hs-hackathon
       path: shared-cluster/deploy-model
       helm:
-        releaseName: gpt-oss-20b-hsworkshop
+        releaseName: eurollm-22b-hsworkshop
         valueFiles:
-          - "gpt-oss-20b-hsworkshop.yaml"
+          - "eurollm-22b-instruct-fp8-hsworkshop.yaml"
   destination:
     server: https://kubernetes.default.svc
     namespace: hsworkshop

@@ -1,3 +1,4 @@
+# NOT DEPLOYED — replaced by eurollm-22b-instruct-fp8-hsworkshop.yaml
 model:
   name: "gpt-oss-20b"
   displayName: "GPT-OSS 20B"

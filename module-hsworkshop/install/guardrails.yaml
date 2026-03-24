@@ -5,7 +5,7 @@
 # 2. OpenWebUI uses guardrails-proxy (nginx) which routes chat completions through
 #    the TrustyAI gateway (:8090/all/v1/chat/completions) and model listing directly
 #    to the predictor. See module-hsworkshop/install/profanity-detector.yaml.
-# 3. All prompts flow through TrustyAI before reaching gpt-oss-20b-service
+# 3. All prompts flow through TrustyAI before reaching eurollm-22b-service
 #    Blocked prompts are logged by Langfuse (OpenWebUI logs the error response)
 apiVersion: trustyai.opendatahub.io/v1alpha1
 kind: GuardrailsOrchestrator
@@ -14,7 +14,7 @@ metadata:
   namespace: hsworkshop
 spec:
   autoConfig:
-    inferenceServiceToGuardrail: gpt-oss-20b-service
+    inferenceServiceToGuardrail: eurollm-22b-service
     detectorServiceLabelToMatch: trustyai/guardrails-groupA
   enableBuiltInDetectors: true
   enableGuardrailsGateway: true

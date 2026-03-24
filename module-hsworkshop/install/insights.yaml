@@ -16,8 +16,8 @@ metadata:
   name: insights-backend-config
   namespace: hsworkshop
 data:
-  MODEL_URL: "http://gpt-oss-20b-service-predictor.hsworkshop.svc.cluster.local:8080/v1"
-  MODEL_NAME: "gpt-oss-20b-service"
+  MODEL_URL: "http://eurollm-22b-service-predictor.hsworkshop.svc.cluster.local:8080/v1"
+  MODEL_NAME: "eurollm-22b-service"
   SSE_INTERVAL_SECONDS: "30"
 ---
 apiVersion: apps/v1
