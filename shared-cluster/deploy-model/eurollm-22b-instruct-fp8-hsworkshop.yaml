@@ -10,15 +10,18 @@ namespace:
 runtime:
   name: "vllm-cuda-runtime-eurollm-22b-hs"
   displayName: "EuroLLM 22B Instruct FP8 vLLM Runtime"
-  # rhaiis v0.13.0 used: vLLM v0.18.0 (latest) introduced a renderers module that
-  # requires tokenizer.model which is absent from this modelcar (only tokenizer.json present)
-  image: "registry.redhat.io/rhaiis/vllm-cuda-rhel9@sha256:ec799bb5eeb7e25b4b25a8917ab5161da6b6f1ab830cbba61bba371cffb0c34d"
+  # Use upstream vLLM v0.18.0 for FP8 compressed-tensors support.
+  # VLLM_USE_V1=0 forces the v0 engine, bypassing the renderers module that
+  # requires tokenizer.model (absent from this modelcar; only tokenizer.json present).
+  image: "docker.io/vllm/vllm-openai:latest"
+  extraEnv:
+    VLLM_USE_V1: "0"
   annotations:
     acceleratorName: "nvidia-gpu"
     apiProtocol: "REST"
     hardwareProfileName: ""
     recommendedAccelerators: '["nvidia.com/gpu"]'
-    runtimeVersion: "v0.13.0"
+    runtimeVersion: "latest"
     servingRuntimeScope: "global"
     templateDisplayName: "EuroLLM 22B Instruct FP8 vLLM Runtime"
     templateName: "vllm-cuda-runtime-eurollm-22b-hs"

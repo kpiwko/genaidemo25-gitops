@@ -46,6 +46,12 @@ spec:
           value: /tmp/flashinfer
         - name: HOME
           value: /tmp
+      {{- with .Values.runtime.extraEnv }}
+      {{- range $k, $v := . }}
+        - name: {{ $k }}
+          value: {{ $v | quote }}
+      {{- end }}
+      {{- end }}
       image: {{ .Values.runtime.image }}
       name: kserve-container
       ports:
