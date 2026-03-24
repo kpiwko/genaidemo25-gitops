@@ -21,8 +21,9 @@ runtime:
     templateDisplayName: "Qwen3.5 27B FP8 vLLM Runtime"
     templateName: "vllm-cuda-runtime-qwen35-27b-fp8-hs"
   extraArgs:
-    - --gpu-memory-utilization=0.90
+    - --gpu-memory-utilization=0.98
     - --max-model-len=32768
+    - --enforce-eager
 
 inference:
   name: "qwen35-27b-fp8-service"
