@@ -6,6 +6,9 @@
 # friendly bilingual message and the conversation can continue normally.
 # All other endpoints (/v1/models, etc.) are forwarded directly to the predictor.
 #
+# Blocked requests are also tagged in Langfuse (tags: ["blocked"]) via the
+# guardrails-langfuse-secret — see langfuse-proxy-secret.yaml.
+#
 # OpenWebUI OPENAI_API_BASE_URL: http://guardrails-proxy.hsworkshop.svc.cluster.local:8080/v1
 apiVersion: v1
 kind: ConfigMap
@@ -15,13 +18,20 @@ metadata:
 data:
   proxy.py: |
     #!/usr/bin/env python3
+    import base64
     import json
+    import os
+    import threading
     import urllib.request
     import urllib.error
     from http.server import HTTPServer, BaseHTTPRequestHandler
 
     GUARDRAILS = "http://guardrails-orchestrator-service.hsworkshop.svc.cluster.local:8090/all"
     PREDICTOR  = "http://gpt-oss-20b-service-predictor.hsworkshop.svc.cluster.local:8080"
+
+    LANGFUSE_HOST       = os.environ.get("LANGFUSE_HOST", "")
+    LANGFUSE_PUBLIC_KEY = os.environ.get("LANGFUSE_PUBLIC_KEY", "")
+    LANGFUSE_SECRET_KEY = os.environ.get("LANGFUSE_SECRET_KEY", "")
 
     MSG_EN = (
         "\u26a0\ufe0f Your message was blocked because it contained inappropriate language. "
@@ -46,6 +56,42 @@ data:
             isinstance(choices, list) and len(choices) == 0
             and any(w.get("type") == "UNSUITABLE_INPUT" for w in warnings)
         )
+
+    def _extract_last_user_message(messages: list) -> str:
+        for msg in reversed(messages):
+            if isinstance(msg, dict) and msg.get("role") == "user":
+                return msg.get("content", "")
+        return ""
+
+    def _tag_blocked_in_langfuse(user_message: str, model: str) -> None:
+        """Fire-and-forget: create a Langfuse trace tagged as blocked."""
+        if not LANGFUSE_HOST or not LANGFUSE_PUBLIC_KEY or not LANGFUSE_SECRET_KEY:
+            return
+        def _send():
+            try:
+                creds = base64.b64encode(
+                    f"{LANGFUSE_PUBLIC_KEY}:{LANGFUSE_SECRET_KEY}".encode()
+                ).decode()
+                payload = json.dumps({
+                    "name": "blocked-request",
+                    "input": {"user_message": user_message},
+                    "output": "BLOCKED",
+                    "tags": ["blocked"],
+                    "metadata": {"reason": "UNSUITABLE_INPUT", "model": model},
+                }).encode()
+                req = urllib.request.Request(
+                    f"{LANGFUSE_HOST}/api/public/traces",
+                    data=payload,
+                    headers={
+                        "Authorization": f"Basic {creds}",
+                        "Content-Type": "application/json",
+                    },
+                    method="POST",
+                )
+                urllib.request.urlopen(req, timeout=5)
+            except Exception as exc:
+                print(f"[langfuse] failed to tag blocked trace: {exc}", flush=True)
+        threading.Thread(target=_send, daemon=True).start()
 
     def _json_response(model: str) -> bytes:
         return json.dumps({
@@ -104,19 +150,6 @@ data:
             self.end_headers()
             self.wfile.write(body)
 
-        def _stream_through(self, resp):
-            self.send_response(200)
-            self.send_header("Content-Type", "text/event-stream")
-            self.send_header("Cache-Control", "no-cache")
-            self.send_header("Connection", "close")
-            self.end_headers()
-            while True:
-                chunk = resp.read(4096)
-                if not chunk:
-                    break
-                self.wfile.write(chunk)
-                self.wfile.flush()
-
         def do_GET(self):
             resp = self._relay(f"{PREDICTOR}{self.path}")
             body = resp.read()
@@ -140,8 +173,10 @@ data:
                 req_body = json.loads(raw)
             except Exception:
                 req_body = {}
-            stream = req_body.get("stream", False)
-            model  = req_body.get("model", "")
+            stream        = req_body.get("stream", False)
+            model         = req_body.get("model", "")
+            messages      = req_body.get("messages", [])
+            user_message  = _extract_last_user_message(messages)
 
             resp = self._relay(f"{GUARDRAILS}{self.path}", body=raw)
             ct   = resp.headers.get("Content-Type", "application/json")
@@ -165,9 +200,9 @@ data:
                             pass
 
                 if blocked:
+                    _tag_blocked_in_langfuse(user_message, model)
                     self._send_sse(_sse_response(model))
                 else:
-                    # Not blocked — forward buffered data then stream the rest
                     self._stream_through_with_prefix(buf, resp)
                 return
 
@@ -180,6 +215,7 @@ data:
                 pass
 
             if blocked:
+                _tag_blocked_in_langfuse(user_message, model)
                 if stream:
                     self._send_sse(_sse_response(model))
                 else:
@@ -207,6 +243,7 @@ data:
 
     if __name__ == "__main__":
         print("Guardrails proxy listening on :8080", flush=True)
+        print(f"Langfuse tagging: {'enabled' if LANGFUSE_HOST else 'disabled (no LANGFUSE_HOST)'}", flush=True)
         HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
 ---
 apiVersion: apps/v1
@@ -231,6 +268,10 @@ spec:
           command: ["python3", "/app/proxy.py"]
           ports:
             - containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: guardrails-langfuse-secret
+                optional: true
           volumeMounts:
             - name: config
               mountPath: /app
