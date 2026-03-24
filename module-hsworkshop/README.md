@@ -132,6 +132,26 @@ In OpenWebUI Admin Panel:
    - **Langfuse Host**: `http://langfuse:3000`
 4. Save — conversations will now appear as traces in Langfuse
 
+#### 5e. Connect guardrails proxy to Langfuse (blocked content tagging)
+
+The guardrails proxy tags blocked requests in Langfuse with `tags: ["blocked"]` so the Insights app can show a "Blocked only" word cloud/graph. It needs its own API key (separate from the Pipelines filter).
+
+1. In Langfuse UI go to **Settings → API Keys → Create new key** and copy the keys
+2. Apply the secret to the cluster:
+   ```bash
+   oc create secret generic guardrails-langfuse-secret -n hsworkshop \
+     --from-literal=LANGFUSE_HOST=http://langfuse:3000 \
+     --from-literal=LANGFUSE_PUBLIC_KEY=pk-lf-... \
+     --from-literal=LANGFUSE_SECRET_KEY=sk-lf-... \
+     --dry-run=client -o yaml | oc apply -f -
+   ```
+3. Restart the proxy to pick up the secret:
+   ```bash
+   oc rollout restart deployment/guardrails-proxy -n hsworkshop
+   ```
+
+> **Switching projects:** When moving to a new workshop run (e.g. `run-1`, `run-2`), create a new API key in that project's Langfuse settings and repeat steps 2–3 above. The Insights app picks up the new project automatically from the dropdown — no restart needed.
+
 ### 6. Import model presets
 
 The `configuration-models.json` file defines the two workshop presets (**Career Guide** and **Free Chat**). Import them:
