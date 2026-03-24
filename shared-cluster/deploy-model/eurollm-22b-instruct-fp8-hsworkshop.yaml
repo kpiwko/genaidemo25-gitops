@@ -28,6 +28,14 @@ runtime:
   extraArgs:
     - --gpu-memory-utilization=0.95
     - --max-model-len=32768
+  extraVolumes:
+    - name: tokenizer-patch
+      configMap:
+        name: eurollm-tokenizer-patch
+  extraVolumeMounts:
+    - name: tokenizer-patch
+      mountPath: /mnt/models/tokenizer_config.json
+      subPath: tokenizer_config.json
 
 inference:
   name: "eurollm-22b-service"

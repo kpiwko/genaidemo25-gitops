@@ -60,6 +60,9 @@ spec:
       volumeMounts:
         - mountPath: /dev/shm
           name: shm
+      {{- with .Values.runtime.extraVolumeMounts }}
+      {{- toYaml . | nindent 8 }}
+      {{- end }}
   multiModel: false
   supportedModelFormats:
     - autoSelect: true
@@ -69,3 +72,6 @@ spec:
         medium: Memory
         sizeLimit: 2Gi
       name: shm
+  {{- with .Values.runtime.extraVolumes }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
