@@ -21,7 +21,7 @@ data:
     from http.server import HTTPServer, BaseHTTPRequestHandler
 
     GUARDRAILS = "http://guardrails-orchestrator-service.hsworkshop.svc.cluster.local:8090/all"
-    PREDICTOR  = "http://qwen35-27b-fp8-service-predictor.hsworkshop.svc.cluster.local:8080"
+    PREDICTOR  = "http://gpt-oss-20b-service-predictor.hsworkshop.svc.cluster.local:8080"
 
     MSG_EN = (
         "\u26a0\ufe0f Your message was blocked because it contained inappropriate language. "

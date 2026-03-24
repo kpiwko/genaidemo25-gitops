@@ -14,7 +14,7 @@ metadata:
   namespace: hsworkshop
 spec:
   autoConfig:
-    inferenceServiceToGuardrail: qwen35-27b-fp8-service
+    inferenceServiceToGuardrail: gpt-oss-20b-service
     detectorServiceLabelToMatch: trustyai/guardrails-groupA
   enableBuiltInDetectors: true
   enableGuardrailsGateway: true
