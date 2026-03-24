@@ -38,6 +38,10 @@ spec:
           value: /tmp/hf_home
         - name: HF_HUB_OFFLINE
           value: "1"
+        - name: TRITON_CACHE_DIR
+          value: /tmp/triton-cache
+        - name: XDG_CACHE_HOME
+          value: /tmp/cache
       image: {{ .Values.runtime.image }}
       name: kserve-container
       ports:
