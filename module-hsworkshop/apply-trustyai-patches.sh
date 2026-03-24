@@ -16,7 +16,7 @@
 set -euo pipefail
 
 NS="${1:-hsworkshop}"
-PREDICTOR="gpt-oss-20b-service-predictor.${NS}.svc.cluster.local"
+PREDICTOR="qwen35-27b-fp8-service-predictor.${NS}.svc.cluster.local"
 
 echo "Applying TrustyAI patches to namespace: ${NS}"
 

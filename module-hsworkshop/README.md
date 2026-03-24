@@ -27,7 +27,7 @@ User → OpenWebUI → guardrails-proxy → TrustyAI gateway → KServe Inferenc
 | SearXNG | Self-hosted metasearch engine for web search in Career Guide preset |
 | Pipelines | Filter layer enabling Langfuse tracing in OpenWebUI |
 | Langfuse | LLM observability: traces, costs, latency |
-| vLLM / KServe | Model serving (gpt-oss-20b) |
+| vLLM / KServe | Model serving (Qwen3.5 27B FP8) |
 | PostgreSQL | Relational data for Langfuse |
 | ClickHouse | Analytical storage for traces/spans |
 | Redis | Queue for Langfuse worker |
@@ -132,7 +132,7 @@ The `configuration-models.json` file defines the two workshop presets (**Career 
 
 To hide the raw base model from the model selector so users only see the presets:
 
-- Admin Panel → Settings → Models → toggle off `gpt-oss-20b-service`
+- Admin Panel → Settings → Models → toggle off `qwen35-27b-fp8-service`
 
 ## Configuration files
 
@@ -171,8 +171,8 @@ After deploying, update the OpenWebUI API connection URL (step 4 above) if the p
 **OpenWebUI shows no models** — the InferenceService is not Ready. Check:
 ```bash
 oc get inferenceservice -n hsworkshop
-oc get pods -n hsworkshop -l serving.kserve.io/inferenceservice=gpt-oss-20b-service
-oc logs -n hsworkshop -l serving.kserve.io/inferenceservice=gpt-oss-20b-service -c kserve-container
+oc get pods -n hsworkshop -l serving.kserve.io/inferenceservice=qwen35-27b-fp8-service
+oc logs -n hsworkshop -l serving.kserve.io/inferenceservice=qwen35-27b-fp8-service -c kserve-container
 ```
 
 **Chat responses are empty or stuck** — the guardrails proxy may be unhealthy. Check:
@@ -206,7 +206,7 @@ oc annotate application.argoproj.io hsworkshop -n openshift-gitops \
 
 **Model pod stuck Pending after rolling update** — KServe rolling updates can deadlock when only one GPU is available: the new pod can't schedule until the old one is gone, but the old one won't terminate until the new one is ready. Fix by deleting the old pod manually:
 ```bash
-oc get pods -n hsworkshop -l serving.kserve.io/inferenceservice=gpt-oss-20b-service
+oc get pods -n hsworkshop -l serving.kserve.io/inferenceservice=qwen35-27b-fp8-service
 oc delete pod -n hsworkshop <old-predictor-pod-name>
 ```
 
@@ -222,7 +222,7 @@ oc apply -f module-hsworkshop/install/guardrails.yaml
 # Fix 1: backend port (headless service requires pod port 8080, not service port 80)
 oc patch configmap guardrails-orchestrator-auto-config -n hsworkshop --type merge -p '{
   "data": {
-    "config.yaml": "openai:\n  service:\n    hostname: gpt-oss-20b-service-predictor.hsworkshop.svc.cluster.local\n    port: 8080\ndetectors:\n  built-in-detector:\n    type: text_contents\n    service:\n      hostname: 127.0.0.1\n      port: 8080\n    chunker_id: whole_doc_chunker\n    default_threshold: 0.5\npassthrough_headers:\n  - Authorization\n  - Content-Type\n"
+    "config.yaml": "openai:\n  service:\n    hostname: qwen35-27b-fp8-service-predictor.hsworkshop.svc.cluster.local\n    port: 8080\ndetectors:\n  built-in-detector:\n    type: text_contents\n    service:\n      hostname: 127.0.0.1\n      port: 8080\n    chunker_id: whole_doc_chunker\n    default_threshold: 0.5\npassthrough_headers:\n  - Authorization\n  - Content-Type\n"
   }
 }'
 

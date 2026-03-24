@@ -14,14 +14,14 @@ spec:
     - repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
       targetRevision: hs-hackathon
       path: module-hsworkshop/install
-    # GPT-OSS 20B model (temporary while Qwen3.5-27B-FP8 modelcar is being built)
+    # Qwen3.5 27B FP8 model via modelcar
     - repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
       targetRevision: hs-hackathon
       path: shared-cluster/deploy-model
       helm:
-        releaseName: gpt-oss-20b-hsworkshop
+        releaseName: qwen35-27b-fp8-hsworkshop
         valueFiles:
-          - "gpt-oss-20b-hsworkshop.yaml"
+          - "qwen35-27b-fp8-hsworkshop.yaml"
   destination:
     server: https://kubernetes.default.svc
     namespace: hsworkshop

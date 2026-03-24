@@ -1,0 +1,48 @@
+model:
+  name: "qwen35-27b-fp8"
+  displayName: "Qwen3.5 27B FP8"
+  sourceUri: "oci://quay.io/dprod/qwen35-27b-fp8-modelcar:latest"
+  format: "vLLM"
+
+namespace:
+  name: "hsworkshop"
+
+runtime:
+  name: "vllm-cuda-runtime-qwen35-27b-fp8-hs"
+  displayName: "Qwen3.5 27B FP8 vLLM Runtime"
+  image: "docker.io/vllm/vllm-openai:v0.18.0"
+  annotations:
+    acceleratorName: "nvidia-gpu"
+    apiProtocol: "REST"
+    hardwareProfileName: ""
+    recommendedAccelerators: '["nvidia.com/gpu"]'
+    runtimeVersion: "v0.18.0"
+    servingRuntimeScope: "global"
+    templateDisplayName: "Qwen3.5 27B FP8 vLLM Runtime"
+    templateName: "vllm-cuda-runtime-qwen35-27b-fp8-hs"
+  extraArgs:
+    - --gpu-memory-utilization=0.90
+    - --max-model-len=32768
+
+inference:
+  name: "qwen35-27b-fp8-service"
+  displayName: "Qwen3.5 27B FP8 Service"
+  scaling:
+    minReplicas: 1
+    maxReplicas: 1
+  resources:
+    requests:
+      cpu: "8"
+      memory: "40Gi"
+      gpu: "1"
+    limits:
+      cpu: "16"
+      memory: "60Gi"
+      gpu: "1"
+  tolerations:
+    - effect: NoSchedule
+      key: nvidia.com/gpu
+      operator: Exists
+
+connection:
+  name: ""
