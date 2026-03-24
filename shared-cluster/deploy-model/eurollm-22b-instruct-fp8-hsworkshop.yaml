@@ -11,11 +11,13 @@ runtime:
   name: "vllm-cuda-runtime-eurollm-22b-hs"
   displayName: "EuroLLM 22B Instruct FP8 vLLM Runtime"
   # Use upstream vLLM v0.18.0 for FP8 compressed-tensors support.
-  # VLLM_USE_V1=0 forces the v0 engine, bypassing the renderers module that
-  # requires tokenizer.model (absent from this modelcar; only tokenizer.json present).
+  # tokenizer_config.json says LlamaTokenizer (needs tokenizer.model/SentencePiece)
+  # but only tokenizer.json is present. preStartScript patches tokenizer_class to
+  # PreTrainedTokenizerFast so vLLM loads the fast tokenizer from tokenizer.json.
   image: "docker.io/vllm/vllm-openai:latest"
-  extraEnv:
-    VLLM_USE_V1: "0"
+  preStartScript: >-
+    while [ ! -f /mnt/models/tokenizer_config.json ]; do sleep 0.2; done;
+    python3 -c 'import json; p="/mnt/models/tokenizer_config.json"; d=json.load(open(p)); d["tokenizer_class"]="PreTrainedTokenizerFast"; json.dump(d,open(p,"w")); print("Patched tokenizer_config.json",flush=True)'
   annotations:
     acceleratorName: "nvidia-gpu"
     apiProtocol: "REST"
@@ -28,14 +30,6 @@ runtime:
   extraArgs:
     - --gpu-memory-utilization=0.95
     - --max-model-len=32768
-  extraVolumes:
-    - name: tokenizer-patch
-      configMap:
-        name: eurollm-tokenizer-patch
-  extraVolumeMounts:
-    - name: tokenizer-patch
-      mountPath: /mnt/models/tokenizer_config.json
-      subPath: tokenizer_config.json
 
 inference:
   name: "eurollm-22b-service"

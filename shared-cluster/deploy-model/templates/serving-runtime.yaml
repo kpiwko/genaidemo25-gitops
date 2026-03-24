@@ -20,19 +20,15 @@ spec:
     prometheus.io/path: /metrics
     prometheus.io/port: "8080"
   containers:
-    - args:
-        - --port=8080
-        - --model=/mnt/models{{- if .Values.model.file }}/{{ .Values.model.file }}{{- end }}
-        - --served-model-name={{`{{.Name}}`}}
-      {{- with .Values.runtime.extraArgs }}
-      {{- range . }}
-        - {{ . | quote }}
-      {{- end }}
-      {{- end }}
-      command:
-        - python3
-        - -m
-        - vllm.entrypoints.openai.api_server
+    - command:
+        - sh
+        - -c
+      args:
+        - |
+          {{- with .Values.runtime.preStartScript }}
+          {{ . | trim }}
+          {{- end }}
+          exec python3 -m vllm.entrypoints.openai.api_server --port=8080 --model=/mnt/models{{- if .Values.model.file }}/{{ .Values.model.file }}{{- end }} "--served-model-name={{`{{.Name}}`}}"{{- range .Values.runtime.extraArgs }} {{ . }}{{- end }}
       env:
         - name: HF_HOME
           value: /tmp/hf_home
