@@ -12,12 +12,20 @@ runtime:
   displayName: "EuroLLM 22B Instruct FP8 vLLM Runtime"
   # Use upstream vLLM v0.18.0 for FP8 compressed-tensors support.
   # tokenizer_config.json says LlamaTokenizer (needs tokenizer.model/SentencePiece)
-  # but only tokenizer.json is present. preStartScript patches tokenizer_class to
-  # PreTrainedTokenizerFast so vLLM loads the fast tokenizer from tokenizer.json.
+  # but the OCI image layers are read-only. preStartScript copies tokenizer files to
+  # /tmp, patches tokenizer_class to PreTrainedTokenizerFast, then vLLM uses --tokenizer
+  # pointing to the patched copy. VLLM_USE_V1=0 bypasses the renderers module entirely.
   image: "docker.io/vllm/vllm-openai:latest"
-  preStartScript: >-
-    while [ ! -f /mnt/models/tokenizer_config.json ]; do sleep 0.2; done;
-    python3 -c 'import json; p="/mnt/models/tokenizer_config.json"; d=json.load(open(p)); d["tokenizer_class"]="PreTrainedTokenizerFast"; json.dump(d,open(p,"w")); print("Patched tokenizer_config.json",flush=True)'
+  extraEnv:
+    VLLM_USE_V1: "0"
+  preStartScript: |
+    while [ ! -f /mnt/models/tokenizer.json ]; do sleep 0.2; done
+    mkdir -p /tmp/tokenizer_patched
+    for f in tokenizer_config.json tokenizer.json special_tokens_map.json; do
+      [ -f "/mnt/models/$f" ] && cp "/mnt/models/$f" /tmp/tokenizer_patched/
+    done
+    python3 -c 'import json; p="/tmp/tokenizer_patched/tokenizer_config.json"; d=json.load(open(p)); d["tokenizer_class"]="PreTrainedTokenizerFast"; json.dump(d,open(p,"w"))'
+    echo "Tokenizer patched: LlamaTokenizer -> PreTrainedTokenizerFast" >&2
   annotations:
     acceleratorName: "nvidia-gpu"
     apiProtocol: "REST"
@@ -30,6 +38,7 @@ runtime:
   extraArgs:
     - --gpu-memory-utilization=0.95
     - --max-model-len=32768
+    - --tokenizer=/tmp/tokenizer_patched
 
 inference:
   name: "eurollm-22b-service"
