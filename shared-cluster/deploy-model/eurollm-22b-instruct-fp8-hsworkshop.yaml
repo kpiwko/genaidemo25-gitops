@@ -10,23 +10,21 @@ namespace:
 runtime:
   name: "vllm-cuda-runtime-eurollm-22b-hs"
   displayName: "EuroLLM 22B Instruct FP8 vLLM Runtime"
-  # vLLM latest used for FP8 compressed-tensors support; v0.13 does not reliably handle it
-  image: "docker.io/vllm/vllm-openai:latest"
+  # rhaiis v0.13.0 used: vLLM v0.18.0 (latest) introduced a renderers module that
+  # requires tokenizer.model which is absent from this modelcar (only tokenizer.json present)
+  image: "registry.redhat.io/rhaiis/vllm-cuda-rhel9@sha256:ec799bb5eeb7e25b4b25a8917ab5161da6b6f1ab830cbba61bba371cffb0c34d"
   annotations:
     acceleratorName: "nvidia-gpu"
     apiProtocol: "REST"
     hardwareProfileName: ""
     recommendedAccelerators: '["nvidia.com/gpu"]'
-    runtimeVersion: "latest"
+    runtimeVersion: "v0.13.0"
     servingRuntimeScope: "global"
     templateDisplayName: "EuroLLM 22B Instruct FP8 vLLM Runtime"
     templateName: "vllm-cuda-runtime-eurollm-22b-hs"
   extraArgs:
     - --gpu-memory-utilization=0.95
     - --max-model-len=32768
-    # tokenizer.model absent from modelcar (only tokenizer.json present);
-    # mistral mode uses mistral-common which loads from tokenizer.json directly
-    - --tokenizer-mode=mistral
 
 inference:
   name: "eurollm-22b-service"
