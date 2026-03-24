@@ -1,0 +1,135 @@
+# HSWorkshop Insights — backend + frontend
+#
+# Secrets are NOT managed here — apply manually:
+#
+#   # ClickHouse + PostgreSQL credentials for the backend
+#   oc create secret generic insights-db-secret -n hsworkshop \
+#     --from-literal=CLICKHOUSE_URL=http://clickhouse:8123 \
+#     --from-literal=CLICKHOUSE_USER=clickhouse \
+#     --from-literal=CLICKHOUSE_PASSWORD=<value> \
+#     --from-literal=POSTGRES_URL=postgresql://langfuse:<password>@postgres:5432/langfuse \
+#     --dry-run=client -o yaml | oc apply -f -
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: insights-backend-config
+  namespace: hsworkshop
+data:
+  MODEL_URL: "http://qwen35-35b-service-predictor.hsworkshop.svc.cluster.local:8080/v1"
+  MODEL_NAME: "qwen35-35b-service"
+  SSE_INTERVAL_SECONDS: "30"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insights-backend
+  namespace: hsworkshop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: insights-backend
+  template:
+    metadata:
+      labels:
+        app: insights-backend
+    spec:
+      serviceAccountName: hsworkshop-anyuid
+      containers:
+        - name: backend
+          image: quay.io/dprod/hsworkshop-insights-backend:latest
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: insights-db-secret
+            - configMapRef:
+                name: insights-backend-config
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: insights-backend
+  namespace: hsworkshop
+spec:
+  selector:
+    app: insights-backend
+  ports:
+    - port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insights-frontend
+  namespace: hsworkshop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: insights-frontend
+  template:
+    metadata:
+      labels:
+        app: insights-frontend
+    spec:
+      serviceAccountName: hsworkshop-anyuid
+      containers:
+        - name: frontend
+          image: quay.io/dprod/hsworkshop-insights-frontend:latest
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: insights-frontend
+  namespace: hsworkshop
+spec:
+  selector:
+    app: insights-frontend
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: insights
+  namespace: hsworkshop
+spec:
+  to:
+    kind: Service
+    name: insights-frontend
+  port:
+    targetPort: 8080
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

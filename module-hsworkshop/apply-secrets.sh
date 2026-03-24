@@ -64,6 +64,12 @@ oc create secret generic minio-secret -n hsworkshop \
   --from-literal=MINIO_ROOT_USER="$MINIO_ROOT_USER" \
   --from-literal=MINIO_ROOT_PASSWORD="$MINIO_ROOT_PASSWORD"
 
+oc create secret generic insights-db-secret -n hsworkshop \
+  --from-literal=CLICKHOUSE_URL="http://clickhouse:8123" \
+  --from-literal=CLICKHOUSE_USER="clickhouse" \
+  --from-literal=CLICKHOUSE_PASSWORD="$CH_PASS" \
+  --from-literal=POSTGRES_URL="postgresql://langfuse:${POSTGRES_PASS}@postgres:5432/langfuse"
+
 oc create secret generic openwebui-secret -n hsworkshop \
   --from-literal=WEBUI_SECRET_KEY="$WEBUI_SECRET_KEY" \
   --from-literal=WEBUI_ADMIN_EMAIL="$WEBUI_ADMIN_EMAIL" \

@@ -64,7 +64,8 @@ detectors:
     output: false
     detector_params:
       regex:
-        - '(?i)\b(fuck|fucker|fucking|fucked|fucks|fuckin|motherfuck|motherfucker|motherfucking|clusterfuck|cunt|cunts|asshole|arsehole|cock|cocksucker|dickhead|prick|twat|wanker|bastards|kurva|kurvy|kurvu|kurvo|kurvi|kurve|kurvičko|kurvin|zkurva|zkurvit|zkurveně|zkurvenec|zkurvený|zkurvená|zkurvenej|zkurvy|píča|pica|piča|pičo|picho|pičus|pičí|čurák|curak|čuráku|churak|čuráci|churaci|kunda|kundy|kundo|mrdat|mrdka|mrde|mrdání|jebat|jebe|jebeš|jebem|vyjebat|pojebat|ojebat|kokot|kokote|kokotů|kokoti|děvka|devka|děvky|devky|děvce|devce|šlapka|slapka|šlapky|slapky|coura|couřit|fena|feny|feně|posraný|posraná|posrat|piča)\b'
+        - '(?i)\b(fuck|fucking|fucker|fucked|motherfucker|motherfucking|clusterfuck|cunt|cunts|asshole|arsehole|cocksucker|dickhead|twat|wanker|bastard)\b'
+        - '(?i)\b(kurv|zkurv|píč|pič|pic|čurák|curak|kund|mrdat|mrdka|jebat|jebe|jebeš|jebem|vyjebat|pojebat|ojebat|kokot|děvk|devk|šlapk|slapk|coura|couřit|posraný|posraná|posrat)'
 routes:
   - name: all
     detectors:
