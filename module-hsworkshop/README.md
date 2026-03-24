@@ -1,27 +1,37 @@
 # HS Workshop — AI Stack
 
-OpenWebUI + Langfuse v3 + TrustyAI GuardrailsOrchestrator running in the `hsworkshop` namespace on OpenShift, backed by a vLLM InferenceService.
+OpenWebUI + Langfuse v3 + TrustyAI guardrails running in the `hsworkshop` namespace on OpenShift, backed by a vLLM InferenceService.
 
 ## Architecture
 
 ```
-User → OpenWebUI → Pipelines (filter) → KServe InferenceService (vLLM)
-                       ↓
-                   Langfuse (tracing)
-                       ↳ Web API → MinIO → Worker → ClickHouse
+User → OpenWebUI → guardrails-proxy → TrustyAI gateway → KServe InferenceService (vLLM)
+                        ↓                    ↓
+                  /v1/models          built-in regex detector
+                  (direct to          (Czech + English swear words)
+                   predictor)
+           ↓
+       Pipelines (filter)
+           ↓
+       Langfuse (tracing)
+           ↳ Web API → MinIO → Worker → ClickHouse
+
+       SearXNG (self-hosted web search, used by Career Guide preset)
 ```
 
 | Component | Purpose |
 |-----------|---------|
 | OpenWebUI | Chat UI with OpenAI-compatible backend |
+| guardrails-proxy | Nginx→Python proxy routing chat through TrustyAI, model listing direct to predictor |
+| TrustyAI | Guardrails orchestrator — built-in regex detector blocks swear words (Czech + English) |
+| SearXNG | Self-hosted metasearch engine for web search in Career Guide preset |
 | Pipelines | Filter layer enabling Langfuse tracing in OpenWebUI |
 | Langfuse | LLM observability: traces, costs, latency |
-| vLLM / KServe | Model serving (gpt-oss-20b or Qwen3.5) |
+| vLLM / KServe | Model serving (gpt-oss-20b) |
 | PostgreSQL | Relational data for Langfuse |
 | ClickHouse | Analytical storage for traces/spans |
 | Redis | Queue for Langfuse worker |
 | MinIO | S3-compatible blob store for event ingestion |
-| TrustyAI | Guardrails orchestrator for prompt safety |
 
 ## Routes
 
@@ -67,21 +77,29 @@ Subsequent users can self-register and get immediate access — `DEFAULT_USER_RO
 
 > **Note:** If updating an existing install, the signup setting may already be stored in the database. Enable it manually if needed: Admin Panel → Settings → General → Enable New User Sign Up → on.
 
-### 4. Set up Langfuse
+### 4. Update OpenWebUI API connection (mandatory)
 
-#### 4a. Create Langfuse admin account
+OpenWebUI stores the model API URL in its database, which overrides the env var after first boot. Update it to route through the guardrails proxy:
+
+1. Admin Panel → Settings → Connections → OpenAI API
+2. Set URL to: `http://guardrails-proxy.hsworkshop.svc.cluster.local:8080/v1`
+3. Verify the connection shows green
+
+### 5. Set up Langfuse
+
+#### 5a. Create Langfuse admin account
 
 1. Open https://langfuse-hsworkshop.apps.brno-hack-pool-s5z4r.aws.rh-ods.com
 2. Click **Sign up** and create an admin account
 3. Create an **Organization** and a **Project** (e.g. `hsworkshop`)
 
-#### 4b. Generate API keys
+#### 5b. Generate API keys
 
 1. In your project go to **Settings → API Keys**
 2. Click **Create new API key**
 3. Copy the **Public Key** (`pk-lf-...`) and **Secret Key** (`sk-lf-...`) — the secret is only shown once
 
-#### 4c. Connect OpenWebUI to Pipelines
+#### 5c. Connect OpenWebUI to Pipelines
 
 Langfuse tracing in OpenWebUI works via the **Pipelines** service (a filter layer). The `pipelines` pod is deployed alongside the stack.
 
@@ -92,7 +110,7 @@ In OpenWebUI Admin Panel:
    - **API Key**: `0p3n-w3bu!`
 3. Save
 
-#### 4d. Install the Langfuse filter pipeline
+#### 5d. Install the Langfuse filter pipeline
 
 1. Go to **Admin Panel → Settings → Pipelines**
 2. Click **Install from GitHub URL** and enter:
@@ -105,6 +123,23 @@ In OpenWebUI Admin Panel:
    - **Langfuse Host**: `http://langfuse:3000`
 4. Save — conversations will now appear as traces in Langfuse
 
+### 6. Import model presets
+
+The `configuration-models.json` file defines the two workshop presets (**Career Guide** and **Free Chat**). Import them:
+
+1. Admin Panel → Workspace → Models → Import (upload icon)
+2. Select `module-hsworkshop/configuration-models.json`
+
+To hide the raw base model from the model selector so users only see the presets:
+
+- Admin Panel → Settings → Models → toggle off `gpt-oss-20b-service`
+
+## Configuration files
+
+| File | Purpose |
+|------|---------|
+| `configuration-models.json` | OpenWebUI model presets (Career Guide, Free Chat) — import via Admin Panel |
+
 ## Verifying the stack
 
 ```bash
@@ -114,19 +149,22 @@ oc get pods -n hsworkshop
 # Model should be READY=True
 oc get inferenceservice -n hsworkshop
 
-# Quick model health check (run from inside the cluster, e.g. via oc exec)
-oc exec -n hsworkshop deployment/openwebui -- \
-  curl -s http://gpt-oss-20b-service-predictor.hsworkshop.svc.cluster.local:8080/v1/models
+# Quick model health check via guardrails proxy
+oc run curl-test --rm -i --restart=Never --image=curlimages/curl -n hsworkshop -- \
+  curl -s http://guardrails-proxy.hsworkshop.svc.cluster.local:8080/v1/models
 ```
 
 ## Updating the model
 
-The model URL in OpenWebUI is set via `OPENAI_API_BASE_URL` in `install/openwebui.yaml`. To switch to a different InferenceService, update that value and commit:
+Chat completions flow through `guardrails-proxy` → TrustyAI gateway → predictor. Model listing goes direct from the proxy to the predictor. When switching models, update three places:
 
-```yaml
-- name: OPENAI_API_BASE_URL
-  value: "http://<inferenceservice-name>-predictor.hsworkshop.svc.cluster.local/v1"
-```
+1. **`install/openwebui.yaml`** — `OPENAI_API_BASE_URL` stays pointing at the guardrails proxy (no change needed unless proxy moves)
+2. **`install/profanity-detector.yaml`** — update `PREDICTOR` variable to the new predictor hostname
+3. **`install/guardrails.yaml`** — update `autoConfig.inferenceServiceToGuardrail` to the new InferenceService name
+4. **`hsworkshop-argocd-app.yaml`** — update the model values file reference
+5. **`configuration-models.json`** — update `base_model_id` in both presets to match the new model ID
+
+After deploying, update the OpenWebUI API connection URL (step 4 above) if the predictor hostname changed.
 
 ## Troubleshooting
 
@@ -136,6 +174,13 @@ oc get inferenceservice -n hsworkshop
 oc get pods -n hsworkshop -l serving.kserve.io/inferenceservice=gpt-oss-20b-service
 oc logs -n hsworkshop -l serving.kserve.io/inferenceservice=gpt-oss-20b-service -c kserve-container
 ```
+
+**Chat responses are empty or stuck** — the guardrails proxy may be unhealthy. Check:
+```bash
+oc get pods -n hsworkshop -l app=guardrails-proxy
+oc logs -n hsworkshop deployment/guardrails-proxy
+```
+Also verify OpenWebUI's API connection URL is pointing at `http://guardrails-proxy.hsworkshop.svc.cluster.local:8080/v1` (Admin Panel → Settings → Connections).
 
 **Langfuse traces not appearing** — tracing goes through the Pipelines service. Check:
 - Pipelines pod is Running: `oc get pods -n hsworkshop -l app=pipelines`
@@ -163,4 +208,31 @@ oc annotate application.argoproj.io hsworkshop -n openshift-gitops \
 ```bash
 oc get pods -n hsworkshop -l serving.kserve.io/inferenceservice=gpt-oss-20b-service
 oc delete pod -n hsworkshop <old-predictor-pod-name>
+```
+
+**TrustyAI AutoConfigFailed** — the operator locks into a failed state via an annotation. Fix by deleting and recreating the resource to force a fresh reconcile:
+```bash
+oc delete guardrailsorchestrator guardrails-orchestrator -n hsworkshop
+oc apply -f module-hsworkshop/install/guardrails.yaml
+```
+
+**TrustyAI orchestrator broken after operator reconcile** — the operator regenerates its ConfigMaps on reconcile, reverting two manual patches. Re-apply after any reconcile:
+
+```bash
+# Fix 1: backend port (headless service requires pod port 8080, not service port 80)
+oc patch configmap guardrails-orchestrator-auto-config -n hsworkshop --type merge -p '{
+  "data": {
+    "config.yaml": "openai:\n  service:\n    hostname: gpt-oss-20b-service-predictor.hsworkshop.svc.cluster.local\n    port: 8080\ndetectors:\n  built-in-detector:\n    type: text_contents\n    service:\n      hostname: 127.0.0.1\n      port: 8080\n    chunker_id: whole_doc_chunker\n    default_threshold: 0.5\npassthrough_headers:\n  - Authorization\n  - Content-Type\n"
+  }
+}'
+
+# Fix 2: swear word regex (replace $^ placeholder with actual pattern)
+# Run the patch script — see module-hsworkshop/apply-trustyai-patches.sh
+```
+
+> The swear word regex patch is too long for inline kubectl. Use `apply-trustyai-patches.sh` after any reconcile (see below).
+
+**TrustyAI reconcile is triggered** when: the `GuardrailsOrchestrator` CR changes, or a Service with label `trustyai/guardrails-groupA` appears/disappears. After re-applying patches, restart the orchestrator:
+```bash
+oc rollout restart deployment/guardrails-orchestrator -n hsworkshop
 ```
