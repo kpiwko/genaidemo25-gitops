@@ -10,13 +10,13 @@ namespace:
 runtime:
   name: "vllm-cuda-runtime-qwen35-27b-fp8-hs"
   displayName: "Qwen3.5 27B FP8 vLLM Runtime"
-  image: "docker.io/vllm/vllm-openai:v0.18.0"
+  image: "docker.io/vllm/vllm-openai:latest"
   annotations:
     acceleratorName: "nvidia-gpu"
     apiProtocol: "REST"
     hardwareProfileName: ""
     recommendedAccelerators: '["nvidia.com/gpu"]'
-    runtimeVersion: "v0.18.0"
+    runtimeVersion: "latest"
     servingRuntimeScope: "global"
     templateDisplayName: "Qwen3.5 27B FP8 vLLM Runtime"
     templateName: "vllm-cuda-runtime-qwen35-27b-fp8-hs"
