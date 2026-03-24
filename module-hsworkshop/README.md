@@ -9,12 +9,15 @@ User → OpenWebUI → guardrails-proxy → TrustyAI gateway → KServe Inferenc
                         ↓                    ↓
                   /v1/models          built-in regex detector
                   (direct to          (Czech + English swear words)
-                   predictor)
+                   predictor)           ↓ blocked → tag trace in Langfuse
            ↓
        Pipelines (filter)
            ↓
        Langfuse (tracing)
            ↳ Web API → MinIO → Worker → ClickHouse
+                                              ↓
+                                    HSWorkshop Insights
+                                    (word cloud · word graph · AI summary)
 
        SearXNG (self-hosted web search, used by Career Guide preset)
 ```
@@ -22,11 +25,12 @@ User → OpenWebUI → guardrails-proxy → TrustyAI gateway → KServe Inferenc
 | Component | Purpose |
 |-----------|---------|
 | OpenWebUI | Chat UI with OpenAI-compatible backend |
-| guardrails-proxy | Nginx→Python proxy routing chat through TrustyAI, model listing direct to predictor |
+| guardrails-proxy | Nginx→Python proxy routing chat through TrustyAI, model listing direct to predictor; tags blocked requests in Langfuse |
 | TrustyAI | Guardrails orchestrator — built-in regex detector blocks swear words (Czech + English) |
 | SearXNG | Self-hosted metasearch engine for web search in Career Guide preset |
 | Pipelines | Filter layer enabling Langfuse tracing in OpenWebUI |
 | Langfuse | LLM observability: traces, costs, latency |
+| HSWorkshop Insights | Visualizes conversation traces — word cloud, word graph, AI summary; supports valid/blocked filtering |
 | vLLM / KServe | Model serving (GPT-OSS 20B) |
 | PostgreSQL | Relational data for Langfuse |
 | ClickHouse | Analytical storage for traces/spans |
@@ -39,6 +43,7 @@ User → OpenWebUI → guardrails-proxy → TrustyAI gateway → KServe Inferenc
 |---------|-----|
 | OpenWebUI | https://openwebui-hsworkshop.apps.brno-hack-pool-s5z4r.aws.rh-ods.com |
 | Langfuse | https://langfuse-hsworkshop.apps.brno-hack-pool-s5z4r.aws.rh-ods.com |
+| HSWorkshop Insights | https://insights-hsworkshop.apps.brno-hack-pool-s5z4r.aws.rh-ods.com |
 
 ## Initial Setup
 
@@ -50,6 +55,10 @@ cd module-hsworkshop
 ```
 
 This generates random credentials, prints them for your password manager, then applies them as OpenShift secrets. The script is idempotent-safe via `--dry-run=client` for the namespace but will fail if secrets already exist — delete them first if re-running.
+
+Secrets created: `postgres-secret`, `clickhouse-secret`, `langfuse-secret`, `minio-secret`, `openwebui-secret`, `insights-db-secret`.
+
+> **Note:** `guardrails-langfuse-secret` is NOT created by this script — it requires Langfuse API keys that only exist after Langfuse is running (step 5). See the Langfuse section below for the command.
 
 ### 2. Deploy via ArgoCD
 

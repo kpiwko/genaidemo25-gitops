@@ -55,9 +55,9 @@ Notes:
 - To dry-run Helm locally before Argo sync:
 
 ```bash
-helm template test /Users/kpiwko/devel/ai-experiments/genaidemo25-gitops/shared-cluster/deploy-model \
+helm template test ./shared-cluster/deploy-model \
   -n genai25-deployments \
-  -f /Users/kpiwko/devel/ai-experiments/genaidemo25-gitops/shared-cluster/deploy-model/gpt-oss-20b.yaml \
+  -f ./shared-cluster/deploy-model/gpt-oss-20b-hsworkshop.yaml \
 | kubectl apply --dry-run=client -f -
 ```
 
@@ -69,34 +69,44 @@ genaidemo25-gitops/
 │   ├── user-setup-argocd-app.yaml    # ArgoCD app for user authentication
 │   ├── rhoai-setup-argocd-app.yaml   # ArgoCD app for RHOAI operator
 │   ├── user-setup/                   # User authentication resources
-│   │   ├── kustomization.yaml        # Kustomize resource list
+│   │   ├── kustomization.yaml
 │   │   ├── hackathon-secret.yaml     # HTPasswd for hackathon user
 │   │   ├── htpasswd-secret.yaml      # HTPasswd for test user
 │   │   ├── oauth-cluster.yaml        # OAuth configuration
-│   │   ├── test-user.yaml            # User and Identity resources
-│   │   └── test-user-rbac.yaml       # RBAC permissions
-│   ├── install-rhoai/                  # RHOAI operator installation
-│   │   ├── kustomization.yaml        # Ordered operator installation
-│   │   ├── namespace.yaml            # redhat-ods-operator namespace
-│   │   ├── operator-group.yaml       # OperatorGroup
-│   │   ├── rbac-presync-monitoring.yaml  # Pre-sync RBAC
-│   │   ├── subscription-authorino.yaml   # Authorino operator
-│   │   └── subscription-rhoai.yaml       # RHOAI operator
-│   └── deploy-model/                 # Future model deployment configs
-│       └── .gitkeep
-├── module-lightspeed/                 # Lightspeed module resources
-│   ├── install-pipelines-argocd-app.yaml     # ArgoCD app for Pipelines
-│   ├── install-web-terminal-argocd-app.yaml  # ArgoCD app for Web Terminal
-│   ├── install-pipelines/            # OpenShift Pipelines operator
-│   │   ├── kustomization.yaml        # Resource ordering
-│   │   ├── namespace.yaml            # openshift-pipelines namespace
-│   │   ├── operator-group.yaml       # OperatorGroup
-│   │   └── subscription.yaml         # Pipelines operator subscription
-│   └── install-web-terminal/         # Web Terminal operator
-│       ├── kustomization.yaml        # Simple subscription-only setup
-│       └── subscription.yaml         # Web Terminal subscription
-└── module-receipts/                   # Future receipts module
-    └── .gitkeep
+│   │   ├── test-user.yaml
+│   │   └── test-user-rbac.yaml
+│   ├── install-rhoai/                # RHOAI operator installation
+│   │   ├── kustomization.yaml
+│   │   ├── namespace.yaml
+│   │   ├── operator-group.yaml
+│   │   ├── rbac-presync-monitoring.yaml
+│   │   ├── subscription-authorino.yaml
+│   │   └── subscription-rhoai.yaml
+│   └── deploy-model/                 # Helm values files for model deployments
+│       ├── gpt-oss-20b-hsworkshop.yaml       # Active: GPT-OSS 20B in hsworkshop
+│       ├── qwen35-27b-fp8-hsworkshop.yaml    # Reference (not deployed)
+│       └── qwen35-35b-a3b-hsworkshop.yaml    # Reference (not deployed)
+└── module-hsworkshop/                # HS Workshop AI stack
+    ├── hsworkshop-argocd-app.yaml    # ArgoCD Application definition
+    ├── configuration-models.json     # OpenWebUI model presets (import via Admin Panel)
+    ├── apply-secrets.sh              # One-time secret generation and apply script
+    ├── apply-trustyai-patches.sh     # Re-apply TrustyAI config patches after reconcile
+    └── install/                      # Kustomize resources
+        ├── kustomization.yaml
+        ├── namespace.yaml
+        ├── rbac.yaml
+        ├── postgres.yaml
+        ├── redis.yaml
+        ├── clickhouse.yaml
+        ├── minio.yaml
+        ├── langfuse.yaml
+        ├── pipelines.yaml
+        ├── searxng.yaml
+        ├── openwebui.yaml
+        ├── guardrails.yaml
+        ├── profanity-detector.yaml   # TrustyAI guardrails proxy with Langfuse tagging
+        ├── insights.yaml             # HSWorkshop Insights backend + frontend
+        └── langfuse-proxy-secret.yaml  # Template for guardrails-langfuse-secret (manual apply)
 ```
 
 ## 🔧 ArgoCD Application Configuration
