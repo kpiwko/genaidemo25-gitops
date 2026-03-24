@@ -73,5 +73,5 @@ spec:
         sizeLimit: 2Gi
       name: shm
   {{- with .Values.runtime.extraVolumes }}
-  {{- toYaml . | nindent 2 }}
+  {{- toYaml . | nindent 4 }}
   {{- end }}
