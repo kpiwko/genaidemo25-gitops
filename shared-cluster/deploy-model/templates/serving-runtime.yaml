@@ -42,6 +42,8 @@ spec:
           value: /tmp/triton-cache
         - name: XDG_CACHE_HOME
           value: /tmp/cache
+        - name: FLASHINFER_WORKSPACE_DIR
+          value: /tmp/flashinfer
       image: {{ .Values.runtime.image }}
       name: kserve-container
       ports:
