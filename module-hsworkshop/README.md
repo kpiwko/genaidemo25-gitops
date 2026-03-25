@@ -251,7 +251,7 @@ oc apply -f module-hsworkshop/install/guardrails.yaml
 # Fix 1: backend port (headless service requires pod port 8080, not service port 80)
 oc patch configmap guardrails-orchestrator-auto-config -n hsworkshop --type merge -p '{
   "data": {
-    "config.yaml": "openai:\n  service:\n    hostname: gpt-oss-20b-service-predictor.hsworkshop.svc.cluster.local\n    port: 8080\ndetectors:\n  built-in-detector:\n    type: text_contents\n    service:\n      hostname: 127.0.0.1\n      port: 8080\n    chunker_id: whole_doc_chunker\n    default_threshold: 0.5\npassthrough_headers:\n  - Authorization\n  - Content-Type\n"
+    "config.yaml": "openai:\n  service:\n    hostname: eurollm-22b-service-predictor.hsworkshop.svc.cluster.local\n    port: 8080\ndetectors:\n  built-in-detector:\n    type: text_contents\n    service:\n      hostname: 127.0.0.1\n      port: 8080\n    chunker_id: whole_doc_chunker\n    default_threshold: 0.5\npassthrough_headers:\n  - Authorization\n  - Content-Type\n"
   }
 }'
 
