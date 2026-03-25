@@ -1,4 +1,4 @@
-# NOT DEPLOYED — kept for reference only; gpt-oss-20b-service is the active model in hsworkshop
+# NOT DEPLOYED — kept for reference only; eurollm-22b-instruct-fp8 is the active model in hsworkshop
 model:
   name: "qwen35-35b-a3b"
   displayName: "Qwen3.5 35B A3B (Q4_K_M GGUF)"

@@ -31,7 +31,7 @@ User → OpenWebUI → guardrails-proxy → TrustyAI gateway → KServe Inferenc
 | Pipelines | Filter layer enabling Langfuse tracing in OpenWebUI |
 | Langfuse | LLM observability: traces, costs, latency |
 | HSWorkshop Insights | Visualizes conversation traces — word cloud, word graph, AI summary; supports valid/blocked filtering |
-| vLLM / KServe | Model serving (GPT-OSS 20B) |
+| vLLM / KServe | Model serving (EuroLLM 22B Instruct FP8) |
 | PostgreSQL | Relational data for Langfuse |
 | ClickHouse | Analytical storage for traces/spans |
 | Redis | Queue for Langfuse worker |
@@ -158,10 +158,11 @@ The `configuration-models.json` file defines the two workshop presets (**Career 
 
 1. Admin Panel → Workspace → Models → Import (upload icon)
 2. Select `module-hsworkshop/configuration-models.json`
+3. For each imported model, open it and set **Visibility** to **Public** — imported models default to Private and won't appear in the model selector for regular users
 
 To hide the raw base model from the model selector so users only see the presets:
 
-- Admin Panel → Settings → Models → toggle off `gpt-oss-20b-service`
+- Admin Panel → Workspace → Models → toggle off `eurollm-22b-service`
 
 ## Configuration files
 
@@ -195,13 +196,37 @@ Chat completions flow through `guardrails-proxy` → TrustyAI gateway → predic
 
 After deploying, update the OpenWebUI API connection URL (step 4 above) if the predictor hostname changed.
 
+## Resetting conversation data
+
+To wipe all traces between workshop runs (keeps schema, secrets, and MinIO blobs intact):
+
+```bash
+CH_USER=$(oc get secret clickhouse-secret -n hsworkshop -o jsonpath='{.data.CLICKHOUSE_USER}' | base64 -d)
+CH_PASS=$(oc get secret clickhouse-secret -n hsworkshop -o jsonpath='{.data.CLICKHOUSE_PASSWORD}' | base64 -d)
+PROJECT_ID="<your-langfuse-project-id>"  # visible in Langfuse URL or traces query below
+
+# Find the project ID
+oc exec -n hsworkshop deployment/clickhouse -- \
+  clickhouse-client --user "$CH_USER" --password "$CH_PASS" \
+  --query "SELECT project_id, count() FROM default.traces GROUP BY project_id"
+
+# Delete trace data (analytics_* are Views — no need to touch them)
+for table in traces observations scores; do
+  oc exec -n hsworkshop deployment/clickhouse -- \
+    clickhouse-client --user "$CH_USER" --password "$CH_PASS" \
+    --query "ALTER TABLE default.${table} DELETE WHERE project_id = '${PROJECT_ID}'"
+done
+```
+
+> **Note:** `analytics_traces`, `analytics_observations`, and `analytics_scores` are ClickHouse Views derived from the base tables — deleting from the base tables is sufficient and attempts to mutate Views will fail with `NOT_IMPLEMENTED`.
+
 ## Troubleshooting
 
 **OpenWebUI shows no models** — the InferenceService is not Ready. Check:
 ```bash
 oc get inferenceservice -n hsworkshop
-oc get pods -n hsworkshop -l serving.kserve.io/inferenceservice=gpt-oss-20b-service
-oc logs -n hsworkshop -l serving.kserve.io/inferenceservice=gpt-oss-20b-service -c kserve-container
+oc get pods -n hsworkshop -l serving.kserve.io/inferenceservice=eurollm-22b-service
+oc logs -n hsworkshop -l serving.kserve.io/inferenceservice=eurollm-22b-service -c kserve-container
 ```
 
 **Chat responses are empty or stuck** — the guardrails proxy may be unhealthy. Check:
@@ -235,7 +260,7 @@ oc annotate application.argoproj.io hsworkshop -n openshift-gitops \
 
 **Model pod stuck Pending after rolling update** — KServe rolling updates can deadlock when only one GPU is available: the new pod can't schedule until the old one is gone, but the old one won't terminate until the new one is ready. Fix by deleting the old pod manually:
 ```bash
-oc get pods -n hsworkshop -l serving.kserve.io/inferenceservice=gpt-oss-20b-service
+oc get pods -n hsworkshop -l serving.kserve.io/inferenceservice=eurollm-22b-service
 oc delete pod -n hsworkshop <old-predictor-pod-name>
 ```
 
