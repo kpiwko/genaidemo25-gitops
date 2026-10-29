@@ -1,3 +1,4 @@
+# NOT DEPLOYED — kept for reference only; qwen36-35b-a3b-nvfp4 is the active model in hsworkshop
 model:
   name: "qwen35-27b-fp8"
   displayName: "Qwen3.5 27B FP8"

@@ -15,4 +15,3 @@ resources:
   - openwebui.yaml
   - guardrails.yaml
   - insights.yaml
-  - eurollm-chat-template.yaml

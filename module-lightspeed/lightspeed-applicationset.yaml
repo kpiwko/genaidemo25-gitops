@@ -22,7 +22,7 @@ spec:
       project: default
       source:
         repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
-        targetRevision: hs-hackathon
+        targetRevision: zijeme-it
         path: "{{ .path }}"
       destination:
         server: https://kubernetes.default.svc

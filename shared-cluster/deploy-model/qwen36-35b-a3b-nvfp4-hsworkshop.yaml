@@ -1,0 +1,59 @@
+# ACTIVE model in hsworkshop (single NVIDIA L40S, 48 GB).
+# Reference config: https://developers.redhat.com/articles/2026/10/22/local-inference-and-benchmarking-red-hat-ai-inference
+# Weights are pulled at startup by the KServe storage initializer from Hugging Face (hf:// is a
+# supported URI format on RHOAI 3.6). Model is public (Apache-2.0), ~25 GiB.
+model:
+  name: "qwen36-35b-a3b-nvfp4"
+  displayName: "Qwen3.6 35B A3B NVFP4 (Red Hat AI)"
+  # Pinned revision of RedHatAI/Qwen3.6-35B-A3B-NVFP4 (checked 2026-10-29)
+  sourceUri: "hf://RedHatAI/Qwen3.6-35B-A3B-NVFP4:e94a930c8e9b8a7d3763e449289c261c9c7d3e5e"
+  format: "vLLM"
+
+namespace:
+  name: "hsworkshop"
+
+runtime:
+  name: "vllm-cuda-runtime-qwen36-hs"
+  displayName: "Qwen3.6 35B A3B NVFP4 vLLM Runtime"
+  # Same image as the RHOAI 3.6 built-in "vllm-cuda-runtime-template" (vLLM v0.24.0)
+  image: "registry.redhat.io/rhaii-fast/vllm-cuda-rhel9@sha256:97c7d6f66f3f0897b3ff10ddd135de930d45bdd116cf41a43e3ad7270029116a"
+  annotations:
+    acceleratorName: "nvidia-gpu"
+    apiProtocol: "REST"
+    hardwareProfileName: ""
+    recommendedAccelerators: '["nvidia.com/gpu"]'
+    runtimeVersion: "v0.24.0"
+    servingRuntimeScope: "global"
+    templateDisplayName: "Qwen3.6 35B A3B NVFP4 vLLM Runtime"
+    templateName: "vllm-cuda-runtime-qwen36-hs"
+  extraArgs:
+    - --gpu-memory-utilization=0.90
+    - --max-model-len=16384
+    - --tensor-parallel-size=1
+    - --enable-auto-tool-choice
+    - --tool-call-parser=hermes
+    - --reasoning-parser=qwen3
+
+inference:
+  name: "qwen36-service"
+  displayName: "Qwen3.6 35B A3B NVFP4 Service"
+  scaling:
+    minReplicas: 1
+    maxReplicas: 1
+  # GPU node is g6e.xlarge: 4 vCPU / 32 GiB (~3.5 CPU / ~28.8 GiB allocatable).
+  resources:
+    requests:
+      cpu: "1500m"
+      memory: "16Gi"
+      gpu: "1"
+    limits:
+      cpu: "3"
+      memory: "24Gi"
+      gpu: "1"
+  tolerations:
+    - effect: NoSchedule
+      key: nvidia.com/gpu
+      operator: Exists
+
+connection:
+  name: ""

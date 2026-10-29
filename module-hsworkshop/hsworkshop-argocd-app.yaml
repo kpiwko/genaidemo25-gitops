@@ -12,16 +12,16 @@ spec:
   sources:
     # OpenWebUI, Langfuse, PostgreSQL, TrustyAI guardrails
     - repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
-      targetRevision: hs-hackathon
+      targetRevision: zijeme-it
       path: module-hsworkshop/install
-    # EuroLLM 22B Instruct FP8 model
+    # Qwen3.6 35B A3B NVFP4 model (the only GPU model; cluster has one L40S)
     - repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
-      targetRevision: hs-hackathon
+      targetRevision: zijeme-it
       path: shared-cluster/deploy-model
       helm:
-        releaseName: eurollm-22b-hsworkshop
+        releaseName: qwen36-hsworkshop
         valueFiles:
-          - "eurollm-22b-instruct-fp8-hsworkshop.yaml"
+          - "qwen36-35b-a3b-nvfp4-hsworkshop.yaml"
   destination:
     server: https://kubernetes.default.svc
     namespace: hsworkshop

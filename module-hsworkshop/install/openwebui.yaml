@@ -32,7 +32,7 @@ spec:
           ports:
             - containerPort: 8080
           env:
-            # Model backend - GPT-OSS 20B InferenceService via internal cluster service
+            # Model backend - Qwen3.6 35B A3B NVFP4 InferenceService via internal cluster service
             # RawDeployment mode exposes via ClusterIP service, not a Route
             - name: OPENAI_API_BASE_URL
               # Route through guardrails-proxy which enforces TrustyAI profanity detection on chat completions

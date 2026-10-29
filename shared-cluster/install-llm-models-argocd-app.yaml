@@ -1,3 +1,6 @@
+# NOT USED in the hsworkshop rollout: the cluster has a single L40S GPU and the
+# hsworkshop Application already deploys Qwen3.6 as the only GPU model.
+# Apply this only on a cluster with spare GPUs (one GPU per model source).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -11,26 +14,12 @@ spec:
   project: default
   sources:
     - repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
-      targetRevision: hs-hackathon
+      targetRevision: zijeme-it
       path: shared-cluster/deploy-model
       helm:
         releaseName: gpt-oss-20b
         valueFiles:
           - "gpt-oss-20b.yaml"
-    - repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
-      targetRevision: hs-hackathon
-      path: shared-cluster/deploy-model
-      helm:
-        releaseName: gemma-3-27b
-        valueFiles:
-          - "gemma-3-27b.yaml"
-    - repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
-      targetRevision: hs-hackathon
-      path: shared-cluster/deploy-model
-      helm:
-        releaseName: qwen35-35b-a3b
-        valueFiles:
-          - "qwen35-35b-a3b.yaml"
   destination:
     server: "https://kubernetes.default.svc"
     namespace: "genai25-deployments"

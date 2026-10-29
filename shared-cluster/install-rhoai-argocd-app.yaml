@@ -1,3 +1,5 @@
+# DO NOT APPLY on clusters where RHOAI is already installed (e.g. RHOAI 3.6 EA).
+# It installs Service Mesh/Serverless/RHOAI 2.x-era subscriptions.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -11,7 +13,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
-    targetRevision: hs-hackathon
+    targetRevision: zijeme-it
     path: shared-cluster/install-rhoai
   destination:
     server: https://kubernetes.default.svc

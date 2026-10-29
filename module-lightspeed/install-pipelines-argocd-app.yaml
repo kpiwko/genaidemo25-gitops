@@ -9,7 +9,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
-    targetRevision: hs-hackathon
+    targetRevision: zijeme-it
     path: module-lightspeed/install-pipelines
   destination:
     server: https://kubernetes.default.svc
