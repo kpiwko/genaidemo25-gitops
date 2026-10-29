@@ -17,6 +17,8 @@ metadata:
   namespace: hsworkshop
 spec:
   replicas: 1
+  strategy:
+    type: Recreate  # RWO volume: never run two pods on it
   selector:
     matchLabels:
       app: openwebui
