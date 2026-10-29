@@ -32,6 +32,7 @@ User → OpenWebUI → guardrails-proxy → TrustyAI gateway → KServe Inferenc
 | Langfuse | LLM observability: traces, costs, latency |
 | HSWorkshop Insights | Visualizes conversation traces — word cloud, word graph, AI summary; supports valid/blocked filtering |
 | vLLM / KServe | Model serving (Qwen3.6 35B A3B NVFP4) |
+| Langfuse | v4.71 (observations-first data model, OTLP ingestion) |
 | PostgreSQL | Relational data for Langfuse |
 | ClickHouse | Analytical storage for traces/spans |
 | Redis | Queue for Langfuse worker |
@@ -121,16 +122,12 @@ In OpenWebUI Admin Panel:
 
 #### 5d. Install the Langfuse filter pipeline
 
-1. Go to **Admin Panel → Settings → Pipelines**
-2. Click **Install from GitHub URL** and enter:
-   ```
-   https://github.com/open-webui/pipelines/blob/main/examples/filters/langfuse_v3_filter_pipeline.py
-   ```
-3. Once installed, open the pipeline settings and enter your Langfuse keys:
-   - **Langfuse Public Key**: `pk-lf-...`
-   - **Langfuse Secret Key**: `sk-lf-...`
-   - **Langfuse Host**: `http://langfuse:3000`
-4. Save — conversations will now appear as traces in Langfuse
+The Langfuse **v4** filter (`module-hsworkshop/pipelines/langfuse_v4_filter_pipeline.py`) is
+installed automatically at pod startup via `PIPELINES_URLS`; its Langfuse keys and host are
+populated from the `guardrails-langfuse-secret` environment. No manual installation is needed.
+
+The only remaining manual step is the OpenWebUI connection above (Settings → Connections →
+`http://pipelines:9099`). Conversations will then appear as traces in Langfuse.
 
 #### 5e. Connect guardrails proxy to Langfuse (blocked content tagging)
 
