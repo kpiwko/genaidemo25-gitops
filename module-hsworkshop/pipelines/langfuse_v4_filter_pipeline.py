@@ -5,7 +5,7 @@ date: 2026-10-29
 version: 1.0.0
 license: MIT
 description: A filter pipeline that uses Langfuse v4 (Python SDK v5, observations-first data model).
-requirements: langfuse>=5.0.0,<6
+requirements: langfuse>=5.0.0
 """
 
 from typing import List, Optional
