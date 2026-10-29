@@ -28,6 +28,9 @@ spec:
         app: minio
     spec:
       serviceAccountName: hsworkshop-anyuid
+      securityContext:
+        runAsUser: 65532
+        fsGroup: 65532
       containers:
         - name: minio
           image: cgr.dev/chainguard/minio@sha256:abdbe7d805b4dc931053275bc65d6c96ea88e66fd121aa3bb87d7354ecd875c5  # docker.io/minio/minio was withdrawn
