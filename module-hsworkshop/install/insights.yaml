@@ -2,12 +2,11 @@
 #
 # Secrets are NOT managed here — apply manually:
 #
-#   # ClickHouse + PostgreSQL credentials for the backend
+#   # Langfuse API keys for the backend (same project keys as OpenWebUI/guardrails)
 #   oc create secret generic insights-db-secret -n hsworkshop \
-#     --from-literal=CLICKHOUSE_URL=http://clickhouse:8123 \
-#     --from-literal=CLICKHOUSE_USER=clickhouse \
-#     --from-literal=CLICKHOUSE_PASSWORD=<value> \
-#     --from-literal=POSTGRES_URL=postgresql://langfuse:<password>@postgres:5432/langfuse \
+#     --from-literal=LANGFUSE_HOST=http://langfuse:3000 \
+#     --from-literal=LANGFUSE_PUBLIC_KEY=pk-lf-... \
+#     --from-literal=LANGFUSE_SECRET_KEY=sk-lf-... \
 #     --dry-run=client -o yaml | oc apply -f -
 ---
 apiVersion: v1
@@ -38,7 +37,8 @@ spec:
       serviceAccountName: hsworkshop-anyuid
       containers:
         - name: backend
-          image: quay.io/dprod/hsworkshop-insights-backend:latest
+          # Built from github.com/kpiwko/hsworkshop-insights (Langfuse v4 API)
+          image: image-registry.openshift-image-registry.svc:5000/hsworkshop/insights-backend:latest
           ports:
             - containerPort: 8000
           envFrom:

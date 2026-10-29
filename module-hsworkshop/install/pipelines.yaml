@@ -37,6 +37,17 @@ spec:
           image: ghcr.io/open-webui/pipelines:main
           ports:
             - containerPort: 9099
+          env:
+            # Auto-install the Langfuse v4 filter at startup (from this repo's
+            # module-hsworkshop/pipelines/). Keys are the Langfuse project keys.
+            - name: PIPELINES_URLS
+              value: "https://raw.githubusercontent.com/kpiwko/genaidemo25-gitops/zijeme-it/module-hsworkshop/pipelines/langfuse_v4_filter_pipeline.py"
+            - name: LANGFUSE_HOST
+              value: "http://langfuse:3000"
+          envFrom:
+            - secretRef:
+                name: guardrails-langfuse-secret
+                optional: true
           volumeMounts:
             - name: data
               mountPath: /app/pipelines
