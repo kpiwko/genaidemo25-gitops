@@ -30,7 +30,7 @@ spec:
       serviceAccountName: hsworkshop-anyuid
       containers:
         - name: minio
-          image: docker.io/minio/minio:latest
+          image: cgr.dev/chainguard/minio@sha256:abdbe7d805b4dc931053275bc65d6c96ea88e66fd121aa3bb87d7354ecd875c5  # docker.io/minio/minio was withdrawn
           args: ["server", "/data", "--console-address", ":9001"]
           ports:
             - containerPort: 9000
@@ -101,7 +101,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: mc
-          image: docker.io/minio/mc:latest
+          image: cgr.dev/chainguard/minio-client@sha256:d13eb5e7ac2c6ebe2b30e632c15d9e1b4f288c292c55c9d19f640aa8187865c6  # -dev variant (has /bin/sh)
           command: ["/bin/sh", "-c"]
           args:
             - |
