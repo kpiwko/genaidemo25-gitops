@@ -28,7 +28,7 @@ spec:
       serviceAccountName: hsworkshop-anyuid
       containers:
         - name: clickhouse
-          image: docker.io/clickhouse/clickhouse-server:24.12-alpine
+          image: docker.io/clickhouse/clickhouse-server:26.4-alpine@sha256:0a16ab71ca2510cb32f37498f825329d7f94f4c8a34dd36336f466f359582938  # Langfuse v4 needs >= 25.12
           ports:
             - containerPort: 8123  # HTTP
             - containerPort: 9000  # TCP (native protocol)

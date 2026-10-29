@@ -22,6 +22,7 @@ data:
     import json
     import os
     import threading
+    import time
     import urllib.request
     import urllib.error
     from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -63,8 +64,17 @@ data:
                 return msg.get("content", "")
         return ""
 
+    def _otel_attr(key: str, value) -> dict:
+        if isinstance(value, list):
+            return {"key": key, "value": {"arrayValue": {"values": [{"stringValue": str(v)} for v in value]}}}
+        return {"key": key, "value": {"stringValue": str(value)}}
+
     def _tag_blocked_in_langfuse(user_message: str, model: str) -> None:
-        """Fire-and-forget: create a Langfuse trace tagged as blocked."""
+        """Fire-and-forget: record a blocked request in Langfuse v4.
+
+        Sends one OTLP/HTTP-JSON root span (Langfuse v4 removed POST /api/public/traces).
+        Insights finds these via the 'blocked' tag on the root observation.
+        """
         if not LANGFUSE_HOST or not LANGFUSE_PUBLIC_KEY or not LANGFUSE_SECRET_KEY:
             return
         def _send():
@@ -72,19 +82,36 @@ data:
                 creds = base64.b64encode(
                     f"{LANGFUSE_PUBLIC_KEY}:{LANGFUSE_SECRET_KEY}".encode()
                 ).decode()
-                payload = json.dumps({
+                now_ns = time.time_ns()
+                span = {
+                    "traceId": os.urandom(16).hex(),
+                    "spanId": os.urandom(8).hex(),
                     "name": "blocked-request",
-                    "input": {"user_message": user_message},
-                    "output": "BLOCKED",
-                    "tags": ["blocked"],
-                    "metadata": {"reason": "UNSUITABLE_INPUT", "model": model},
-                }).encode()
+                    "kind": 1,
+                    "startTimeUnixNano": str(now_ns),
+                    "endTimeUnixNano": str(now_ns + 1_000_000),
+                    "attributes": [
+                        _otel_attr("langfuse.trace.name", "blocked-request"),
+                        _otel_attr("langfuse.trace.tags", ["blocked"]),
+                        _otel_attr("langfuse.observation.type", "guardrail"),
+                        _otel_attr("langfuse.observation.level", "WARNING"),
+                        _otel_attr("langfuse.observation.input", json.dumps({"user_message": user_message}, ensure_ascii=False)),
+                        _otel_attr("langfuse.observation.output", "BLOCKED"),
+                        _otel_attr("langfuse.trace.metadata.reason", "UNSUITABLE_INPUT"),
+                        _otel_attr("langfuse.trace.metadata.model", model),
+                    ],
+                }
+                payload = json.dumps({"resourceSpans": [{
+                    "resource": {"attributes": [_otel_attr("service.name", "guardrails-proxy")]},
+                    "scopeSpans": [{"scope": {"name": "guardrails-proxy"}, "spans": [span]}],
+                }]}).encode()
                 req = urllib.request.Request(
-                    f"{LANGFUSE_HOST}/api/public/traces",
+                    f"{LANGFUSE_HOST}/api/public/otel/v1/traces",
                     data=payload,
                     headers={
                         "Authorization": f"Basic {creds}",
                         "Content-Type": "application/json",
+                        "x-langfuse-ingestion-version": "4",
                     },
                     method="POST",
                 )

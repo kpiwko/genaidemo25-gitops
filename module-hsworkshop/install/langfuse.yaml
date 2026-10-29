@@ -19,7 +19,7 @@ spec:
       serviceAccountName: hsworkshop-anyuid
       containers:
         - name: langfuse-web
-          image: docker.io/langfuse/langfuse:3
+          image: docker.io/langfuse/langfuse:4.71.0@sha256:5338ee88d4ec07028836f6af9d98a9b411f8eeda0ad9fae66502d849b04da724
           ports:
             - containerPort: 3000
           env:
@@ -56,6 +56,10 @@ spec:
           envFrom:
             - secretRef:
                 name: langfuse-secret
+            # Headless init: org/project/API keys/admin user (created by apply-secrets.sh)
+            - secretRef:
+                name: langfuse-init-secret
+                optional: true
           resources:
             requests:
               cpu: "500m"
@@ -89,7 +93,7 @@ spec:
       serviceAccountName: hsworkshop-anyuid
       containers:
         - name: langfuse-worker
-          image: docker.io/langfuse/langfuse-worker:3
+          image: docker.io/langfuse/langfuse-worker:4.71.0@sha256:7a96801ecb291758785d68bb388b628d6cdff3ee67553c432b63244b008d4a47
           env:
             - name: TELEMETRY_ENABLED
               value: "false"
