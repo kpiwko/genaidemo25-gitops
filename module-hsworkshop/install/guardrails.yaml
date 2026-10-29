@@ -12,6 +12,11 @@ kind: GuardrailsOrchestrator
 metadata:
   name: guardrails-orchestrator
   namespace: hsworkshop
+  annotations:
+    # AutoConfig fails permanently if the ServingRuntime does not exist yet;
+    # sync after the model (wave 0) so it can find qwen36-service.
+    argocd.argoproj.io/sync-wave: "5"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   autoConfig:
     inferenceServiceToGuardrail: qwen36-service

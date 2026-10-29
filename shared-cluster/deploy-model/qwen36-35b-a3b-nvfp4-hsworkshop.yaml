@@ -15,14 +15,14 @@ namespace:
 runtime:
   name: "vllm-cuda-runtime-qwen36-hs"
   displayName: "Qwen3.6 35B A3B NVFP4 vLLM Runtime"
-  # Same image as the RHOAI 3.6 built-in "vllm-cuda-runtime-template" (vLLM v0.24.0)
+  # Same image as the RHOAI 3.6 built-in "vllm-cuda-runtime-template" (template label says v0.24.0; image reports vLLM 0.28.0+rhaiv.7)
   image: "registry.redhat.io/rhaii-fast/vllm-cuda-rhel9@sha256:97c7d6f66f3f0897b3ff10ddd135de930d45bdd116cf41a43e3ad7270029116a"
   annotations:
     acceleratorName: "nvidia-gpu"
     apiProtocol: "REST"
     hardwareProfileName: ""
     recommendedAccelerators: '["nvidia.com/gpu"]'
-    runtimeVersion: "v0.24.0"
+    runtimeVersion: "v0.28.0"
     servingRuntimeScope: "global"
     templateDisplayName: "Qwen3.6 35B A3B NVFP4 vLLM Runtime"
     templateName: "vllm-cuda-runtime-qwen36-hs"

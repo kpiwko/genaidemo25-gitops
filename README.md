@@ -6,6 +6,8 @@ This repository provides streamlined GitOps configurations to automate the deplo
 
 **Red Hat OpenShift GitOps operator** (productized ArgoCD) must be installed on the target cluster(s) before deploying these configurations. This operator is typically available through the OpenShift OperatorHub.
 
+See [docs/argocd.md](docs/argocd.md) for how the hsworkshop cluster is wired (branch `zijeme-it`, Qwen3.6 35B A3B NVFP4 on a single L40S) and how to operate Argo CD.
+
 ## Model Deployment
 
 This repo now separates namespace/RBAC bootstrap from model deployment. Deploy the namespace once, then manage any number of models safely.
@@ -13,7 +15,7 @@ This repo now separates namespace/RBAC bootstrap from model deployment. Deploy t
 ### 0) Prereqs
 
 - OpenShift GitOps (Argo CD) installed
-- RHOAI/KServe installed (use `shared-cluster/install-rhoai-argocd-app.yaml`)
+- RHOAI/KServe installed. Use `shared-cluster/install-rhoai-argocd-app.yaml` only on clusters **without** RHOAI; never on RHOAI 3.x clusters.
 
 ### 1) Create image pull secret (if needed)
 
@@ -57,7 +59,7 @@ Notes:
 ```bash
 helm template test ./shared-cluster/deploy-model \
   -n genai25-deployments \
-  -f ./shared-cluster/deploy-model/gpt-oss-20b-hsworkshop.yaml \
+  -f ./shared-cluster/deploy-model/qwen36-35b-a3b-nvfp4-hsworkshop.yaml \
 | kubectl apply --dry-run=client -f -
 ```
 
@@ -83,7 +85,8 @@ genaidemo25-gitops/
 │   │   ├── subscription-authorino.yaml
 │   │   └── subscription-rhoai.yaml
 │   └── deploy-model/                 # Helm values files for model deployments
-│       ├── gpt-oss-20b-hsworkshop.yaml       # Active: GPT-OSS 20B in hsworkshop
+│       ├── qwen36-35b-a3b-nvfp4-hsworkshop.yaml  # Active: Qwen3.6 35B A3B NVFP4 in hsworkshop
+│       ├── gpt-oss-20b-hsworkshop.yaml       # Reference (not deployed)
 │       ├── qwen35-27b-fp8-hsworkshop.yaml    # Reference (not deployed)
 │       └── qwen35-35b-a3b-hsworkshop.yaml    # Reference (not deployed)
 └── module-hsworkshop/                # HS Workshop AI stack
