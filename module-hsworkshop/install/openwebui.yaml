@@ -105,7 +105,7 @@ metadata:
   name: openwebui
   namespace: hsworkshop
 spec:
-  host: openwebui-hsworkshop.apps.brno-hack-pool-s5z4r.aws.rh-ods.com
+  host: openwebui-hsworkshop.apps.kpicl2-pool-rft8p.aws.rh-ods.com
   to:
     kind: Service
     name: openwebui

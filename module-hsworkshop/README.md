@@ -41,9 +41,9 @@ User → OpenWebUI → guardrails-proxy → TrustyAI gateway → KServe Inferenc
 
 | Service | URL |
 |---------|-----|
-| OpenWebUI | https://openwebui-hsworkshop.apps.brno-hack-pool-s5z4r.aws.rh-ods.com |
-| Langfuse | https://langfuse-hsworkshop.apps.brno-hack-pool-s5z4r.aws.rh-ods.com |
-| HSWorkshop Insights | https://insights-hsworkshop.apps.brno-hack-pool-s5z4r.aws.rh-ods.com |
+| OpenWebUI | https://openwebui-hsworkshop.apps.kpicl2-pool-rft8p.aws.rh-ods.com |
+| Langfuse | https://langfuse-hsworkshop.apps.kpicl2-pool-rft8p.aws.rh-ods.com |
+| HSWorkshop Insights | https://insights-hsworkshop.apps.kpicl2-pool-rft8p.aws.rh-ods.com |
 
 ## Initial Setup
 
@@ -79,7 +79,7 @@ oc annotate application.argoproj.io hsworkshop -n openshift-gitops \
 
 The admin account is created automatically on first boot using `WEBUI_ADMIN_EMAIL` and `WEBUI_ADMIN_PASSWORD` from `openwebui-secret` (set by `apply-secrets.sh`).
 
-1. Open https://openwebui-hsworkshop.apps.brno-hack-pool-s5z4r.aws.rh-ods.com
+1. Open https://openwebui-hsworkshop.apps.kpicl2-pool-rft8p.aws.rh-ods.com
 2. Log in with the email and password you saved in your password manager
 
 Subsequent users can self-register and get immediate access — `DEFAULT_USER_ROLE=user` and `ENABLE_SIGNUP=true` are set in `openwebui.yaml`.
@@ -98,7 +98,7 @@ OpenWebUI stores the model API URL in its database, which overrides the env var 
 
 #### 5a. Create Langfuse admin account
 
-1. Open https://langfuse-hsworkshop.apps.brno-hack-pool-s5z4r.aws.rh-ods.com
+1. Open https://langfuse-hsworkshop.apps.kpicl2-pool-rft8p.aws.rh-ods.com
 2. Click **Sign up** and create an admin account
 3. Create an **Organization** and a **Project** (e.g. `hsworkshop`)
 
