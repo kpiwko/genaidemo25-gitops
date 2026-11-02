@@ -1,0 +1,38 @@
+# OpenWebUI settings for the custom HTTPS chat domain.
+# Applied on top of install/openwebui.yaml; the base stays HTTP-accessible via
+# its cluster-domain Route so the workshop keeps working without the overlay.
+#
+# WEBUI_URL: public URL used for OAuth/SSO callbacks and generated links.
+# WEBUI_SESSION_COOKIE_SECURE: cookies only over HTTPS (chat host is HTTPS).
+# WEBUI_SESSION_COOKIE_SAME_SITE=lax: keeps the existing cluster-domain Route
+#   usable for the same browser session (lax allows top-level navigation);
+#   strict would break any cross-host link into the UI.
+#
+# CORS_ALLOW_ORIGIN: both origins are kept intentionally. The existing
+# cluster-domain Route (https://openwebui-hsworkshop.apps.kpicl2-pool-rft8p.aws.rh-ods.com)
+# remains the "alias" origin so current bookmarks/presets keep working during
+# the transition. Remove the alias once the custom domain is the only entrypoint.
+#
+# Note (documented limitation): OpenWebUI serves both Routes; it does not
+# redirect the alias to the canonical host. A canonical redirect would need
+# router-level logic (out of scope, would affect the shared default Route).
+#
+# Signup policy (ENABLE_SIGNUP / DEFAULT_USER_ROLE) is intentionally NOT changed.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openwebui
+spec:
+  template:
+    spec:
+      containers:
+        - name: openwebui
+          env:
+            - name: WEBUI_URL
+              value: "https://__CHAT_HOST__"
+            - name: WEBUI_SESSION_COOKIE_SECURE
+              value: "true"
+            - name: WEBUI_SESSION_COOKIE_SAME_SITE
+              value: "lax"
+            - name: CORS_ALLOW_ORIGIN
+              value: "https://__CHAT_HOST__;https://openwebui-hsworkshop.apps.kpicl2-pool-rft8p.aws.rh-ods.com"

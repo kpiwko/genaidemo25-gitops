@@ -1,0 +1,34 @@
+# Minimal RBAC for the OpenShift router to read the cert-manager TLS Secret.
+# Per OCP 4.21 "Securing routes with the cert-manager Operator" procedure:
+#   Role:   verbs get,list,watch on secrets, resourceNames restricted to the
+#           single certificate Secret (no blanket secret access).
+#   Subject: the router service account openshift-ingress:router.
+# sync-wave -1: applied after the Certificate (-2), before the Route (0).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: openwebui-custom-cert-reader
+  namespace: __NAMESPACE__
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["__CERT_SECRET_NAME__"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: openwebui-custom-cert-reader
+  namespace: __NAMESPACE__
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: openwebui-custom-cert-reader
+subjects:
+  - kind: ServiceAccount
+    name: router
+    namespace: openshift-ingress

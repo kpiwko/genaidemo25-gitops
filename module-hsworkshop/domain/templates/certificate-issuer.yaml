@@ -1,0 +1,47 @@
+# Namespaced ACME Issuer with Cloudflare DNS-01 solver.
+# The Cloudflare API token is NOT in Git: apply-custom-domain-secret.sh creates
+# Secret cloudflare-dns01 in namespace __NAMESPACE__ directly on the cluster.
+#
+# sync-wave: -2 so Issuer/Certificate are applied (and can become Ready) before
+# the router RBAC (-1) and the custom Route (0) that references the Secret.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: __ISSUER_NAME__
+  namespace: __NAMESPACE__
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  acme:
+    # Rendered to Let's Encrypt staging or production by render.sh
+    server: __ACME_SERVER__
+    email: __ACME_EMAIL__
+    privateKeySecretRef:
+      name: __ISSUER_NAME__-account-key
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-dns01
+              key: api-token
+---
+# Certificate for exactly one SAN: the chat hostname.
+# secretName is referenced by Route openwebui-custom via spec.tls.externalCertificate.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: openwebui-custom-cert
+  namespace: __NAMESPACE__
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  isCA: false
+  commonName: __CHAT_HOST__
+  dnsNames:
+    - __CHAT_HOST__
+  usages:
+    - server auth
+  issuerRef:
+    kind: Issuer
+    name: __ISSUER_NAME__
+  secretName: __CERT_SECRET_NAME__
