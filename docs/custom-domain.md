@@ -120,9 +120,11 @@ ACME_ENV=production ./render.sh    # explicit re-render for the live host
 > `chat.hsworkshop.fous.ai` by design. Do not use a staging certificate on the live
 > public hostname, and do not instruct users to bypass certificate warnings.
 
-## Activation (two-phase, opt-in — NOT done in this change)
+## Activation (two-phase, opt-in — **DONE 2026-11-02**, see the plan's verification log)
 
-The Argo CD Application `hsworkshop` still points at `module-hsworkshop/install`.
+The Argo CD Application `hsworkshop` now points at `module-hsworkshop/overlays/custom-domain`
+(both in Git, commit `62a4b3e`, and live via the JSON patch below). To deactivate, point
+`sources[0].path` back at `module-hsworkshop/install`.
 
 > **Prerequisite: commit and push the overlay first.** Argo CD activates only what is in
 > Git, so the overlay and its rendered files must be committed and pushed to
@@ -297,9 +299,9 @@ no restart/delete/patch, missing token file errors, malformed tokens rejected).
 
 ## Blockers / not done here
 
-- **Cluster credentials expired** — the `hsworkshop` kubeconfig context token returns 401.
-  All cluster-side read-only preflight (live CRD check, cert-manager operand readiness,
-  `RouteExternalCertificate` gate state) and any mutation is deferred to the follow-up
-  unit. No context switch was performed; the user's active context was left untouched.
-- No DNS record created, no token provisioned, no certificate issued, no Argo source-path
-  change, nothing committed or pushed — all deferred per scope.
+- **None currently.** Activation completed and verified live on 2026-11-02 (see
+  `docs/plans/2026-11-02-chat-custom-domain.md` §Live activation verification).
+- Historical note (implementation time, since resolved): cluster credentials were expired,
+  so all cluster-side preflight was deferred to the follow-up unit and re-verified live
+  before activation. The user's Cloudflare CNAME was verified DNS-only and propagated
+  before the Route was admitted.
