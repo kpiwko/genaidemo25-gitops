@@ -11,9 +11,12 @@ spec:
   project: default
   sources:
     # OpenWebUI, Langfuse, PostgreSQL, TrustyAI guardrails
+    # Custom-domain overlay (chat.hsworkshop.fous.ai): adds Issuer/Certificate,
+    # router RBAC, Route openwebui-custom and the OpenWebUI env patch on top of
+    # install/. Activate/deactivate by pointing this path back at install/.
     - repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
       targetRevision: zijeme-it
-      path: module-hsworkshop/install
+      path: module-hsworkshop/overlays/custom-domain
     # Qwen3.6 35B A3B NVFP4 model (the only GPU model; cluster has one L40S)
     - repoURL: https://github.com/kpiwko/genaidemo25-gitops.git
       targetRevision: zijeme-it
