@@ -8,6 +8,10 @@ This repository provides streamlined GitOps configurations to automate the deplo
 
 See [docs/argocd.md](docs/argocd.md) for how the hsworkshop cluster is wired (branch `zijeme-it`, Qwen3.6 35B A3B NVFP4 on a single L40S) and how to operate Argo CD.
 
+Other docs: [docs/custom-domain.md](docs/custom-domain.md) — optional chat-only custom domain
+(`chat.hsworkshop.fous.ai`) via cert-manager + Route `externalCertificate`; decisions are
+recorded in [docs/adr/](docs/adr/) and implementation plans in [docs/plans/](docs/plans/).
+
 ## Model Deployment
 
 This repo now separates namespace/RBAC bootstrap from model deployment. Deploy the namespace once, then manage any number of models safely.
@@ -94,6 +98,13 @@ genaidemo25-gitops/
     ├── configuration-models.json     # OpenWebUI model presets (import via Admin Panel)
     ├── apply-secrets.sh              # One-time secret generation and apply script
     ├── apply-trustyai-patches.sh     # Re-apply TrustyAI config patches after reconcile
+    ├── apply-custom-domain-secret.sh # Out-of-band Cloudflare DNS-01 token Secret (custom domain)
+    ├── domain/                       # Non-secret renderer for the custom-domain overlay
+    │   ├── render.sh                 #   deterministic render of overlays/custom-domain
+    │   ├── config.env.example        #   non-secret inputs (domain, ACME env, email)
+    │   └── templates/                #   overlay templates with __PLACEHOLDER__ tokens
+    ├── overlays/custom-domain/       # Optional chat-only custom-domain overlay (generated)
+    ├── tests/run-tests.sh            # Offline tests: base + overlay render/invariants
     └── install/                      # Kustomize resources
         ├── kustomization.yaml
         ├── namespace.yaml

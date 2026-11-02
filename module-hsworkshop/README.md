@@ -46,6 +46,11 @@ User → OpenWebUI → guardrails-proxy → TrustyAI gateway → KServe Inferenc
 | Langfuse | https://langfuse-hsworkshop.apps.kpicl2-pool-rft8p.aws.rh-ods.com |
 | HSWorkshop Insights | https://insights-hsworkshop.apps.kpicl2-pool-rft8p.aws.rh-ods.com |
 
+**Optional chat-only custom domain:** `https://chat.hsworkshop.fous.ai` — an opt-in Kustomize
+overlay (`overlays/custom-domain`) serving OpenWebUI only, with a Let's Encrypt certificate
+(cert-manager DNS-01 via Cloudflare) attached through `Route.spec.tls.externalCertificate`.
+Not active by default. See [../docs/custom-domain.md](../docs/custom-domain.md).
+
 ## Initial Setup
 
 ### 1. Apply secrets (first time only)
@@ -166,6 +171,9 @@ To hide the raw base model from the model selector so users only see the presets
 | File | Purpose |
 |------|---------|
 | `configuration-models.json` | OpenWebUI model presets (Career Guide, Free Chat) — import via Admin Panel |
+| `domain/render.sh` | Deterministic renderer for the optional custom-domain overlay (non-secret inputs) |
+| `apply-custom-domain-secret.sh` | Out-of-band provisioning of the Cloudflare DNS-01 token Secret (never in Git) |
+| `tests/run-tests.sh` | Offline test suite for the base + custom-domain overlay |
 
 ## Verifying the stack
 
