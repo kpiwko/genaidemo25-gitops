@@ -1,0 +1,33 @@
+# Additional edge-terminated Route on the custom chat hostname.
+# The original Route openwebui (cluster-domain host) remains untouched in the base.
+#
+# spec.tls.externalCertificate.name is the cert-manager-managed Secret.
+# Requirements (OCP 4.21, RouteExternalCertificate feature gate, default on):
+#   - the referenced Secret must be type kubernetes.io/tls with tls.crt/tls.key
+#   - the router service account must be able to get/list/watch that Secret
+#     (granted in rbac-router.yaml)
+#   - tls.certificate / tls.key must NOT be set when externalCertificate is used
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: openwebui-custom
+  namespace: hsworkshop
+  annotations:
+    # Documented DNS target for the Cloudflare DNS-only CNAME record.
+    custom-domain.hsworkshop/dns-target: router-default.apps.kpicl2-pool-rft8p.aws.rh-ods.com
+    # sync-wave 0: created after Certificate (-2) and router RBAC (-1). Do NOT
+    # rely on this alone for the first activation: use the documented two-phase
+    # activation (certificate-only first) in docs/custom-domain.md.
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  host: chat.hsworkshop.fous.ai
+  to:
+    kind: Service
+    name: openwebui
+  port:
+    targetPort: 8080
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+    externalCertificate:
+      name: openwebui-custom-tls

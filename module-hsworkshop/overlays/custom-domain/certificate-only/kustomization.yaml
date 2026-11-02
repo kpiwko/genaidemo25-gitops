@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# PHASE 1 of the two-phase activation (see docs/custom-domain.md "Activation"):
+# certificate-only pre-provision.
+#
+# Deploy ONLY the Issuer + Certificate so the certificate is issued and the
+# Secret openwebui-custom-tls exists BEFORE the custom Route is created.
+# This intentionally does NOT include the base stack or the Route.
+#
+# Use case: validate DNS-01 + issuance end-to-end (staging or production)
+# without exposing any custom-domain Route. When the Certificate is Ready,
+# proceed to the full overlay (module-hsworkshop/overlays/custom-domain).
+#
+# Generated from templates by module-hsworkshop/domain/render.sh together with
+# the full overlay; keep both in sync by re-rendering. Rendered to
+# overlays/custom-domain/certificate-only/ (its own kustomization directory,
+# self-contained: certificate-issuer.yaml is rendered inside it as well).
+resources:
+  - certificate-issuer.yaml
