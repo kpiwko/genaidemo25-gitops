@@ -1,0 +1,23 @@
+# Nested kustomization for the managed Langfuse filter artifacts (Task 3).
+#
+# The base (module-hsworkshop/install/kustomization.yaml) includes this
+# directory as a resource. Keeping the configMapGenerator here means its file
+# sources are LOCAL to this kustomization root, so standard kustomize load
+# restrictions stay fully enabled - no --load-restrictor flag and no reliance
+# on builder-specific defaults. The generated name is content-hashed; the
+# install/pipelines.yaml Deployment references `pipelines-langfuse-filter`
+# and kustomize rewrites the reference to the generated
+# `pipelines-langfuse-filter-<hash>` name.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+generatorOptions:
+  disableNameSuffixHash: false
+
+configMapGenerator:
+  - name: pipelines-langfuse-filter
+    namespace: hsworkshop
+    files:
+      - langfuse_v4_filter_pipeline.py
+      - requirements.lock
+      - check_ready.py

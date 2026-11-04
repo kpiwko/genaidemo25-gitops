@@ -30,18 +30,37 @@ spec:
       serviceAccountName: hsworkshop-anyuid
       containers:
         - name: openwebui
-          image: ghcr.io/open-webui/open-webui:latest
+          # Pinned to the currently deployed OpenWebUI 0.12.5 image
+          # (commit f7ac7ee10962ddec0017f5c29b6740d9b9c5faca, verified in
+          # docs/headless-openwebui.md). No upgrade.
+          image: ghcr.io/open-webui/open-webui@sha256:0b399a8ba34558e181d316750455f2a95376a38cd60a61b9c942e138898944bd
           ports:
             - containerPort: 8080
           env:
-            # Model backend - Qwen3.6 35B A3B NVFP4 InferenceService via internal cluster service
-            # RawDeployment mode exposes via ClusterIP service, not a Route
-            - name: OPENAI_API_BASE_URL
-              # Route through guardrails-proxy which enforces TrustyAI profanity detection on chat completions
-              # while passing model listing and other endpoints directly to the predictor
-              value: "http://guardrails-proxy.hsworkshop.svc.cluster.local:8080/v1"
-            - name: OPENAI_API_KEY
-              value: "unused"
+            # Model backends - ordered, semicolon-separated, index-paired with
+            # OPENAI_API_KEYS below (OpenWebUI 0.12.5 config.py pairs by list index):
+            #   1. Qwen3.6 35B A3B NVFP4 InferenceService via guardrails-proxy
+            #      (TrustyAI profanity detection on chat completions)
+            #   2. Pipelines (Langfuse v4 filter)
+            # The singular OPENAI_API_BASE_URL/OPENAI_API_KEY pair is removed to
+            # avoid competing with the plural form.
+            - name: OPENAI_API_BASE_URLS
+              value: "http://guardrails-proxy.hsworkshop.svc.cluster.local:8080/v1;http://pipelines.hsworkshop.svc.cluster.local:9099"
+            # Explicit secretKeyRefs BEFORE the composed OPENAI_API_KEYS so the
+            # referenced keys are visible/auditable in the pod spec; the guardrails
+            # placeholder value is explicitly unused and is NOT real protection.
+            - name: GUARDRAILS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openwebui-connections-secret
+                  key: GUARDRAILS_API_KEY
+            - name: PIPELINES_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openwebui-connections-secret
+                  key: PIPELINES_API_KEY
+            - name: OPENAI_API_KEYS
+              value: "$(GUARDRAILS_API_KEY);$(PIPELINES_API_KEY)"
             # Langfuse tracing - keys populated after first Langfuse deploy
             - name: LANGFUSE_HOST
               value: "http://langfuse:3000"
@@ -54,17 +73,73 @@ spec:
               value: "false"
             - name: ENABLE_EVALUATION_ARENA_MODELS
               value: "false"
-            # Web search via self-hosted SearXNG
-            - name: ENABLE_RAG_WEB_SEARCH
-              value: "true"
-            - name: RAG_WEB_SEARCH_ENGINE
+            # Web search: preserved OFF (owner-admin inventory, docs §13).
+            # 0.12.5 (frozen commit f7ac7ee) reads ENABLE_WEB_SEARCH /
+            # WEB_SEARCH_ENGINE / SEARXNG_QUERY_URL
+            # (backend/open_webui/config.py:1178,1187,1234); the previously
+            # declared ENABLE_RAG_WEB_SEARCH / RAG_WEB_SEARCH_ENGINE names are
+            # NOT read by this pin and were removed.
+            # Effective search stays disabled: inventoried persisted
+            # web.search.enable=false. WEB_SEARCH_ENGINE/SEARXNG_QUERY_URL are
+            # inert while search is off; the engine value only records the
+            # intended self-hosted backend (inventoried live engine is the
+            # pinned default empty string).
+            - name: ENABLE_WEB_SEARCH
+              value: "false"
+            - name: WEB_SEARCH_ENGINE
               value: "searxng"
             - name: SEARXNG_QUERY_URL
               value: "http://searxng:8080/search?q=<query>&format=json"
-            - name: ENABLE_SIGNUP
+            # Code execution / interpreter: preserved ON with the pinned
+            # pyodide engine (inventoried live values are true/pyodide).
+            # Declared explicitly so persistence-off does not rely on implicit
+            # image defaults (which match: config.py:415-439 defaults
+            # True/pyodide for these four settings).
+            - name: ENABLE_CODE_EXECUTION
               value: "true"
+            - name: CODE_EXECUTION_ENGINE
+              value: "pyodide"
+            - name: ENABLE_CODE_INTERPRETER
+              value: "true"
+            - name: CODE_INTERPRETER_ENGINE
+              value: "pyodide"
+            # Startup-config policy (headless plan Task 2):
+            #   - The live DB already has effective enable_signup:false
+            #     (bootstrap side effect); declaring false keeps the manifest
+            #     honest. No auth hooks, no signup-policy reopening.
+            #   - With ENABLE_PERSISTENT_CONFIG=false, env governs startup
+            #     config; 0.12.5 Config.get/get_all return the env-derived
+            #     DEFAULTS instead of DB rows
+            #     (backend/open_webui/models/config.py:136-150,189-198).
+            #     The named workshop settings are declared explicitly above
+            #     (web search off, code tools on). The remaining persisted
+            #     keys have since been diffed against the pinned defaults —
+            #     PASS, 434/434 accounted, 0 undeclared customizations
+            #     (docs/headless-openwebui.md §13.2) — and the fresh-isolated
+            #     signup fixture PASSED 8/8 checks (§13.3). Post-deploy
+            #     acceptance and the still-UNCONFIRMED admin recovery point
+            #     are recorded in §13.4: do not sync until the owner confirms
+            #     that recovery point or approves a bounded backup step.
+            - name: ENABLE_SIGNUP
+              value: "false"
+            - name: ENABLE_PERSISTENT_CONFIG
+              value: "false"
             - name: DEFAULT_USER_ROLE
               value: "user"
+            # Existing admin bootstrap credentials via explicit refs; these
+            # override the legacy envFrom below (env wins over envFrom for the
+            # same keys). The legacy openwebui-secret still supplies signing
+            # keys and Langfuse keys and is preserved unchanged.
+            - name: WEBUI_ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: openwebui-admin-bootstrap-secret
+                  key: WEBUI_ADMIN_EMAIL
+            - name: WEBUI_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: openwebui-admin-bootstrap-secret
+                  key: WEBUI_ADMIN_PASSWORD
           envFrom:
             - secretRef:
                 name: openwebui-secret

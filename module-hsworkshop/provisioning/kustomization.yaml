@@ -1,0 +1,29 @@
+# Nested kustomization for the OpenWebUI PostSync provisioning artifacts
+# (Task 5; architect+planner amendment 2026-11-03).
+#
+# The base (module-hsworkshop/install/kustomization.yaml) includes this
+# directory as a resource. Keeping the configMapGenerator here means its file
+# sources are LOCAL to this kustomization root, so standard kustomize load
+# restrictions stay fully enabled - no --load-restrictor flag and no reliance
+# on builder-specific defaults. The generated name is content-hashed; the
+# install/openwebui-provisioning.yaml Job volume references
+# `openwebui-workshop-provision` and kustomize rewrites the reference to the
+# generated `openwebui-workshop-provision-<hash>` name, so any change to the
+# provisioner script or the sole sanitized presets input rolls the Job.
+#
+# The sole canonical presets input, provisioning/configuration-models.json,
+# was MOVED here (unchanged content) from the module root by the amendment -
+# no duplicate and no symlink. The CM and the Job intentionally share the
+# base name `openwebui-workshop-provision` (legal: different kinds).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+generatorOptions:
+  disableNameSuffixHash: false
+
+configMapGenerator:
+  - name: openwebui-workshop-provision
+    namespace: hsworkshop
+    files:
+      - provision_openwebui.py
+      - configuration-models.json

@@ -10,8 +10,24 @@ resources:
   - minio.yaml
   - langfuse.yaml
   - pipelines.yaml
+  # Managed Langfuse filter artifacts (Task 3): nested kustomization that
+  # generates the content-hash ConfigMap `pipelines-langfuse-filter` from its
+  # LOCAL files (filter module + hash-checked requirements lock + readiness
+  # checker). Including it as a directory resource keeps every generator file
+  # inside its own kustomization root, so standard kustomize load
+  # restrictions stay enabled (no flags, no builder-default assumptions).
+  - ../pipelines
   - searxng.yaml
   - profanity-detector.yaml
   - openwebui.yaml
+  # PostSync preset provisioning (Task 5): bounded additive one-shot Job
+  # converging the two workshop presets via the OpenWebUI REST API.
+  - openwebui-provisioning.yaml
+  # Managed provisioning artifacts (Task 5): nested kustomization that
+  # generates the content-hash ConfigMap `openwebui-workshop-provision` from
+  # its LOCAL files (provisioner script + sole sanitized presets input,
+  # moved into provisioning/ by the architect+planner amendment). Same
+  # standard-load-restrictions pattern as ../pipelines above.
+  - ../provisioning
   - guardrails.yaml
   - insights.yaml

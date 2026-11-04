@@ -33,11 +33,15 @@ fi
 
 # Temp repo mirror: the overlay references the base via ../../install, so
 # building a rendered overlay outside the real repo tree requires the same
-# relative layout.
+# relative layout. The base kustomization includes the nested ../pipelines
+# and ../provisioning kustomizations (managed-filter and provisioning
+# ConfigMap generators), so the mirror needs those directories too.
 MIRROR="${TMP}/repo"
 SAN_DIR="${MIRROR}/module-hsworkshop/overlays/custom-domain"
 mkdir -p "${MIRROR}/module-hsworkshop/overlays"
 cp -R "${BASE}" "${MIRROR}/module-hsworkshop/install"
+cp -R "${MODULE}/pipelines" "${MIRROR}/module-hsworkshop/pipelines"
+cp -R "${MODULE}/provisioning" "${MIRROR}/module-hsworkshop/provisioning"
 
 render() { # render <workshop-domain> <acme-env> <email> [outdir]
   local dom="$1" env_="$2" email="${3:-kpiwko@redhat.com}" out="${4:-${SAN_DIR}}"
@@ -61,26 +65,61 @@ rdr() { # rdr VAR=value [VAR=value ...] <outdir>   (no separator needed)
   env -i PATH="${PATH}" HOME="${HOME:-/tmp}" "${envs[@]}" bash "${RENDER}" "${out}"
 }
 
-echo "== 1. Base install builds and matches the committed Git tree (base independence) ==" >&2
+echo "== 1. Base install builds and is semantically independent of the overlay ==" >&2
 if OUT="$(kbuild "${BASE}")"; then
   ok "base kustomize build succeeded"
 else
   fail "base kustomize build failed: ${OUT}"
 fi
-# The base must be untouched relative to HEAD. ':(top)' guards against running
-# from a subdirectory; we compare the whole module-hsworkshop/install path.
-if git -C "${ROOT}" diff --quiet HEAD -- module-hsworkshop/install \
-   && git -C "${ROOT}" diff --cached --quiet HEAD -- module-hsworkshop/install; then
-  ok "module-hsworkshop/install is identical to HEAD (no local base modifications)"
-else
-  fail "module-hsworkshop/install differs from HEAD: base must stay unchanged"
-fi
-# No overlay content may leak into the base build.
-if printf '%s\n' "${OUT}" | grep -q 'openwebui-custom'; then
+# Semantic base independence (Task 5): the base must contain none of the
+# overlay's custom-domain objects and must carry the headless invariants
+# (plural connection URLs, no singular competitor, ENABLE_SIGNUP=false,
+# PostSync provisioning Job + hash ConfigMap). This replaces the earlier
+# whole-base-equals-HEAD assertion, which cannot hold while the headless
+# work is locally staged before its reviewed commit.
+if printf '%s\n' "${OUT}" | grep -q 'openwebui-custom\|letsencrypt-production-dns01'; then
   fail "base build unexpectedly contains overlay objects"
 else
   ok "base build contains no overlay objects"
 fi
+python3 - "${BASE}" <<'PYEOF'
+import subprocess, sys, yaml
+try:
+    out = subprocess.run(["kustomize", "build", sys.argv[1]], capture_output=True, text=True, check=True).stdout
+except FileNotFoundError:
+    out = subprocess.run(["oc", "kustomize", sys.argv[1]], capture_output=True, text=True, check=True).stdout
+docs = [d for d in yaml.safe_load_all(out) if d]
+dep = [d for d in docs if d.get("kind") == "Deployment" and d["metadata"]["name"] == "openwebui"][0]
+env = {e["name"]: e.get("value") for e in dep["spec"]["template"]["spec"]["containers"][0]["env"]}
+assert env["OPENAI_API_BASE_URLS"] == "http://guardrails-proxy.hsworkshop.svc.cluster.local:8080/v1;http://pipelines.hsworkshop.svc.cluster.local:9099", env.get("OPENAI_API_BASE_URLS")
+assert "OPENAI_API_BASE_URL" not in env and "OPENAI_API_KEY" not in env, "singular connection env must be gone"
+assert env["ENABLE_SIGNUP"] == "false", env.get("ENABLE_SIGNUP")
+assert env["ENABLE_PERSISTENT_CONFIG"] == "false", env.get("ENABLE_PERSISTENT_CONFIG")
+jobs = [d for d in docs if d.get("kind") == "Job" and d["metadata"]["name"] == "openwebui-workshop-provision"]
+assert len(jobs) == 1, "PostSync provisioning Job missing from base"
+ann = jobs[0]["metadata"]["annotations"]
+assert ann["argocd.argoproj.io/hook"] == "PostSync", ann
+assert ann["argocd.argoproj.io/hook-delete-policy"] == "BeforeHookCreation", ann
+cms = [d for d in docs if d.get("kind") == "ConfigMap" and d["metadata"]["name"].startswith("openwebui-workshop-provision-")]
+assert len(cms) == 1 and set(cms[0]["data"]) == {"provision_openwebui.py", "configuration-models.json"}, "provisioning hash ConfigMap missing/malformed"
+assert jobs[0]["spec"]["template"]["spec"]["volumes"][0]["configMap"]["name"] == cms[0]["metadata"]["name"], "Job volume not hash-rewritten"
+# PVC preservation (parsed YAML, not grep): the exact claim set and the
+# Deployment/PVC wiring must survive the headless work untouched.
+pvcs = {d["metadata"]["name"]: d for d in docs if d.get("kind") == "PersistentVolumeClaim"}
+assert set(pvcs) == {"openwebui-data", "pipelines-data", "postgres-data",
+                     "clickhouse-data", "minio-data"}, sorted(pvcs)
+assert pvcs["openwebui-data"]["spec"]["resources"]["requests"]["storage"] == "5Gi"
+assert pvcs["pipelines-data"]["spec"]["resources"]["requests"]["storage"] == "2Gi"
+assert pvcs["openwebui-data"]["spec"]["accessModes"] == ["ReadWriteOnce"]
+assert pvcs["pipelines-data"]["spec"]["accessModes"] == ["ReadWriteOnce"]
+ow_vols = {v["name"]: v for v in dep["spec"]["template"]["spec"]["volumes"]}
+assert ow_vols["data"]["persistentVolumeClaim"]["claimName"] == "openwebui-data"
+pl_dep = [d for d in docs if d.get("kind") == "Deployment" and d["metadata"]["name"] == "pipelines"][0]
+pl_vols = {v["name"]: v for v in pl_dep["spec"]["template"]["spec"]["volumes"]}
+assert pl_vols["data"]["persistentVolumeClaim"]["claimName"] == "pipelines-data"
+print("BASE_SEMANTIC_OK")
+PYEOF
+[[ $? -eq 0 ]] && ok "base carries headless invariants: plural URLs, signup=false, provisioning Job+CM wired" || fail "base semantic invariants failed"
 
 echo "== 2. Deterministic render (same input -> identical output) ==" >&2
 render hsworkshop.fous.ai staging kpiwko@redhat.com "${TMP}/a"
@@ -366,8 +405,15 @@ assert "externalCertificate" not in orig["spec"].get("tls", {}), "original Route
 dep = objs[("apps/v1", "Deployment", "hsworkshop", "openwebui")]
 envs = {e["name"]: e.get("value") for e in dep["spec"]["template"]["spec"]["containers"][0]["env"]}
 assert envs["WEBUI_URL"] == "https://chat.hsworkshop.fous.ai", envs
-assert envs["OPENAI_API_BASE_URL"].startswith("http://guardrails-proxy"), envs
-assert envs["ENABLE_SIGNUP"] == "true" and envs["DEFAULT_USER_ROLE"] == "user", envs
+assert envs["OPENAI_API_BASE_URLS"].startswith("http://guardrails-proxy"), envs
+assert "OPENAI_API_BASE_URL" not in envs and "OPENAI_API_KEY" not in envs, "singular connection env must be gone"
+# Task 5 desired state (supersedes the old pre-headless expectation): the
+# live effective signup policy is false and the base declares it
+# explicitly; the overlay must NOT reopen signup or change user role.
+assert envs["ENABLE_SIGNUP"] == "false", envs
+assert "DEFAULT_USER_ROLE" not in envs or envs["DEFAULT_USER_ROLE"] == "user", envs
+# Headless provisioning flows through the overlay unchanged.
+assert ("batch/v1", "Job", "hsworkshop", "openwebui-workshop-provision") in objs, "provisioning Job missing from overlay"
 added = set(objs) - base_keys
 assert len(added) == 5, f"expected exactly 5 added objects, got {sorted(added)}"
 added_secrets = {k for k in added if k[1] == "Secret"}
@@ -428,7 +474,10 @@ app = yaml.safe_load(open(sys.argv[1]))
 srcs = app["spec"]["sources"]
 assert len(srcs) == 2, f"expected 2 sources, got {len(srcs)}"
 s0, s1 = srcs
-assert s0["path"] == "module-hsworkshop/install", s0
+# Task 5: the ACTUAL active first source is the custom-domain overlay
+# (accepted current state; unchanged by the headless work — the provisioning
+# Job and hash CM flow through the overlay's base).
+assert s0["path"] == "module-hsworkshop/overlays/custom-domain", s0
 assert s0["targetRevision"] == "zijeme-it", s0
 assert s0["repoURL"] == "https://github.com/kpiwko/genaidemo25-gitops.git", s0
 # The model source must be identical whether or not the install path changes later.

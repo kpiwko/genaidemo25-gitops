@@ -83,22 +83,46 @@ oc annotate application.argoproj.io hsworkshop -n openshift-gitops \
 
 ### 3. Log in to OpenWebUI
 
-The admin account is created automatically on first boot using `WEBUI_ADMIN_EMAIL` and `WEBUI_ADMIN_PASSWORD` from `openwebui-secret` (set by `apply-secrets.sh`).
+The admin account's credentials are referenced explicitly from `openwebui-admin-bootstrap-secret` (provisioned by `apply-openwebui-secrets.sh`) and override the legacy `openwebui-secret` envFrom — the existing admin is reused, never reset.
 
 1. Open https://openwebui-hsworkshop.apps.kpicl2-pool-rft8p.aws.rh-ods.com
 2. Log in with the email and password you saved in your password manager
 
-Subsequent users can self-register and get immediate access — `DEFAULT_USER_ROLE=user` and `ENABLE_SIGNUP=true` are set in `openwebui.yaml`.
+Signup is declared disabled in `openwebui.yaml` (`ENABLE_SIGNUP=false`, matching the live effective policy) and `DEFAULT_USER_ROLE=user`; new users are created by the operator, not self-registration.
 
 > **Note:** If updating an existing install, the signup setting may already be stored in the database. Enable it manually if needed: Admin Panel → Settings → General → Enable New User Sign Up → on.
 
-### 4. Update OpenWebUI API connection (mandatory)
+### 4. OpenWebUI API connections and model presets (automatic)
 
-OpenWebUI stores the model API URL in its database, which overrides the env var after first boot. Update it to route through the guardrails proxy:
+Connections and model presets are configured **headlessly** — no manual
+Admin Panel setup is needed:
 
-1. Admin Panel → Settings → Connections → OpenAI API
-2. Set URL to: `http://guardrails-proxy.hsworkshop.svc.cluster.local:8080/v1`
-3. Verify the connection shows green
+- **Connections** are declared in `install/openwebui.yaml` as the plural,
+  index-paired `OPENAI_API_BASE_URLS`/`OPENAI_API_KEYS` env (guardrails
+  proxy first, Pipelines second; keys composed from
+  `openwebui-connections-secret` via explicit secretKeyRefs). With
+  `ENABLE_PERSISTENT_CONFIG=false` the declared env governs startup config.
+- **Model presets** (`provisioning/configuration-models.json` — Career
+  Guide and Free Chat, with public read visibility) are provisioned by the
+  `openwebui-workshop-provision` PostSync Job on every Argo CD sync: after
+  the sync's resources are healthy, the Job signs in as the existing admin
+  (credentials from `openwebui-admin-bootstrap-secret`), diffs the managed
+  presets against the server, and additively imports only changes —
+  unrelated/private models are never touched, and a converged second run
+  performs no writes.
+
+> **Prerequisites for the hook to succeed:** the Secrets from
+> `apply-openwebui-secrets.sh` (`openwebui-connections-secret`,
+> `openwebui-admin-bootstrap-secret`) must exist in the namespace before
+> the sync — the Job fails closed (and the sync is marked degraded) when
+> they are missing; it never resets or promotes accounts. If the sync is
+> unhealthy for unrelated reasons, fix that first — Argo CD blocks the
+> PostSync hook until the main resources are healthy; do not run the Job
+> manually to bypass it. The last hook result (success or failure) is
+> retained between syncs for audit (`BeforeHookCreation` policy only).
+> These headless changes are implemented and validated offline in this
+> repository; they are **not yet deployed** — the live rollout is gated
+> (see [../docs/headless-openwebui.md](../docs/headless-openwebui.md)).
 
 ### 5. Set up Langfuse
 
@@ -114,25 +138,21 @@ OpenWebUI stores the model API URL in its database, which overrides the env var 
 2. Click **Create new API key**
 3. Copy the **Public Key** (`pk-lf-...`) and **Secret Key** (`sk-lf-...`) — the secret is only shown once
 
-#### 5c. Connect OpenWebUI to Pipelines
+#### 5c. Pipelines connection (automatic)
 
-Langfuse tracing in OpenWebUI works via the **Pipelines** service (a filter layer). The `pipelines` pod is deployed alongside the stack.
+The Pipelines connection (`http://pipelines.hsworkshop.svc.cluster.local:9099`
+with `PIPELINES_API_KEY` from `openwebui-connections-secret`) is declared in
+`install/openwebui.yaml` as part of the plural connection env — no manual
+Admin Panel connection is needed (see step 4).
 
-In OpenWebUI Admin Panel:
-1. Go to **Settings → Connections**
-2. Add a new OpenAI API connection:
-   - **URL**: `http://pipelines:9099`
-   - **API Key**: `0p3n-w3bu!`
-3. Save
+#### 5d. Install the Langfuse filter pipeline (automatic)
 
-#### 5d. Install the Langfuse filter pipeline
-
-The Langfuse **v4** filter (`module-hsworkshop/pipelines/langfuse_v4_filter_pipeline.py`) is
-installed automatically at pod startup via `PIPELINES_URLS`; its Langfuse keys and host are
-populated from the `guardrails-langfuse-secret` environment. No manual installation is needed.
-
-The only remaining manual step is the OpenWebUI connection above (Settings → Connections →
-`http://pipelines:9099`). Conversations will then appear as traces in Langfuse.
+The Langfuse **v4** filter (`provisioning/../pipelines/langfuse_v4_filter_pipeline.py`,
+see `pipelines/`) is deployed as a content-hash ConfigMap and copied onto the
+existing Pipelines PVC by an init container on the same pinned image — no
+manual installation is needed. Its Langfuse keys and host come from the
+`guardrails-langfuse-secret` environment (see 5e below); the dependency lock
+is `pipelines/requirements.lock`.
 
 #### 5e. Connect guardrails proxy to Langfuse (blocked content tagging)
 
@@ -154,15 +174,17 @@ The guardrails proxy tags blocked requests in Langfuse with `tags: ["blocked"]` 
 
 > **Switching projects:** When moving to a new workshop run (e.g. `run-1`, `run-2`), create a new API key in that project's Langfuse settings and repeat steps 2–3 above. The Insights app picks up the new project automatically from the dropdown — no restart needed.
 
-### 6. Import model presets
+### 6. Model presets (automatic)
 
-The `configuration-models.json` file defines the two workshop presets (**Career Guide** and **Free Chat**). Import them:
+The two workshop presets (**Career Guide** and **Free Chat**, public read
+visibility) live in `provisioning/configuration-models.json` and are
+provisioned automatically by the `openwebui-workshop-provision` PostSync Job
+on every Argo CD sync (see step 4) — no manual Admin Panel import is needed,
+and the public-read visibility is part of the managed presets, not a manual
+per-model setting.
 
-1. Admin Panel → Workspace → Models → Import (upload icon)
-2. Select `module-hsworkshop/configuration-models.json`
-3. For each imported model, open it and set **Visibility** to **Public** — imported models default to Private and won't appear in the model selector for regular users
-
-To hide the raw base model from the model selector so users only see the presets:
+To hide the raw base model from the model selector so users only see the
+presets:
 
 - Admin Panel → Workspace → Models → toggle off `qwen36-service`
 
@@ -170,9 +192,11 @@ To hide the raw base model from the model selector so users only see the presets
 
 | File | Purpose |
 |------|---------|
-| `configuration-models.json` | OpenWebUI model presets (Career Guide, Free Chat) — import via Admin Panel |
+| `provisioning/configuration-models.json` | OpenWebUI model presets (Career Guide, Free Chat) — sole input of the PostSync provisioning Job |
+| `provisioning/provision_openwebui.py` | Additive preset provisioner run by the PostSync Job (stdlib only) |
 | `domain/render.sh` | Deterministic renderer for the optional custom-domain overlay (non-secret inputs) |
 | `apply-custom-domain-secret.sh` | Out-of-band provisioning of the Cloudflare DNS-01 token Secret (never in Git) |
+| `apply-openwebui-secrets.sh` | Out-of-band provisioning of the connections + admin-bootstrap Secrets (never in Git) |
 | `tests/run-tests.sh` | Offline test suite for the base + custom-domain overlay |
 
 ## Verifying the stack
@@ -193,11 +217,11 @@ oc run curl-test --rm -i --restart=Never --image=curlimages/curl -n hsworkshop -
 
 Chat completions flow through `guardrails-proxy` → TrustyAI gateway → predictor. Model listing goes direct from the proxy to the predictor. When switching models, update three places:
 
-1. **`install/openwebui.yaml`** — `OPENAI_API_BASE_URL` stays pointing at the guardrails proxy (no change needed unless proxy moves)
+1. **`install/openwebui.yaml`** — the plural `OPENAI_API_BASE_URLS` first entry stays pointing at the guardrails proxy (no change needed unless proxy moves); `OPENAI_API_KEYS` is composed from `GUARDRAILS_API_KEY`/`PIPELINES_API_KEY` refs
 2. **`install/profanity-detector.yaml`** — update `PREDICTOR` variable to the new predictor hostname
 3. **`install/guardrails.yaml`** — update `autoConfig.inferenceServiceToGuardrail` to the new InferenceService name
 4. **`hsworkshop-argocd-app.yaml`** — update the model values file reference
-5. **`configuration-models.json`** — update `base_model_id` in both presets to match the new model ID
+5. **`provisioning/configuration-models.json`** — update `base_model_id` in both presets to match the new model ID
 
 After deploying, update the OpenWebUI API connection URL (step 4 above) if the predictor hostname changed.
 

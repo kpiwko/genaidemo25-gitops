@@ -1,6 +1,8 @@
 # OpenWebUI Pipelines — filter/transform layer enabling Langfuse tracing
-# Connect OpenWebUI to this service via Admin Panel > Settings > Connections
-# URL: http://pipelines:9099  API Key: 0p3n-w3bu!
+# Connect OpenWebUI to this service via the OPENAI_API_BASE_URLS plural env
+# in install/openwebui.yaml (index-paired with OPENAI_API_KEYS):
+#   URL: http://pipelines.hsworkshop.svc.cluster.local:9099
+#   API key: PIPELINES_API_KEY from openwebui-connections-secret (Task 2).
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -32,18 +34,64 @@ spec:
         app: pipelines
     spec:
       serviceAccountName: hsworkshop-anyuid
+      # Content-hash ConfigMap (Task 3): managed filter module + hash-checked
+      # requirements lock + readiness checker. Any change to any of the three
+      # files changes the generated content hash and rolls the Deployment.
+      initContainers:
+        - name: install-managed-filter
+          # Same pinned image as the main container (no new image build):
+          # copies ONLY the managed .py file onto the existing PVC,
+          # preserving every other pipeline and all persisted valves.
+          image: ghcr.io/open-webui/pipelines@sha256:b48e9bc338ce2be0acfbeff01810db72408a12f07739f9e3879c1f2b00952d6e
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              # Copy ONLY the managed filter module; never touch other .py
+              # files, subfolders or valves.json on the PVC (no reset).
+              cp -f /managed/langfuse_v4_filter_pipeline.py /app/pipelines/langfuse_v4_filter_pipeline.py
+              echo "managed filter copied to PVC"
+          volumeMounts:
+            - name: data
+              mountPath: /app/pipelines
+            - name: managed-filter
+              mountPath: /managed
+              readOnly: true
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
       containers:
         - name: pipelines
-          image: ghcr.io/open-webui/pipelines:main
+          # Pinned to the currently deployed Pipelines image (frozen by
+          # digest in docs/headless-openwebui.md - no commit mapping exists
+          # for this digest; freeze is by digest only). No upgrade.
+          image: ghcr.io/open-webui/pipelines@sha256:b48e9bc338ce2be0acfbeff01810db72408a12f07739f9e3879c1f2b00952d6e
           ports:
             - containerPort: 9099
           env:
-            # Auto-install the Langfuse v4 filter at startup (from this repo's
-            # module-hsworkshop/pipelines/). Keys are the Langfuse project keys.
-            - name: PIPELINES_URLS
-              value: "https://raw.githubusercontent.com/kpiwko/genaidemo25-gitops/zijeme-it/module-hsworkshop/pipelines/langfuse_v4_filter_pipeline.py"
+            # Hash-checked dependency lock (langfuse 5.0.4 + OpenTelemetry
+            # closure, sha256-pinned): installed by the image's own start.sh
+            # (PIPELINES_REQUIREMENTS_PATH -> `pip install -r`) BEFORE any
+            # pipeline module is loaded. pip verifies the sha256 hashes; a
+            # tampered artifact aborts startup. The filter module carries no
+            # frontmatter requirements line - this lock is the single source.
+            - name: PIPELINES_REQUIREMENTS_PATH
+              value: /managed/requirements.lock
             - name: LANGFUSE_HOST
               value: "http://langfuse:3000"
+            # Server API key: same Secret/key Task 2 wired into OpenWebUI's
+            # OPENAI_API_KEYS, so both sides always match. Explicit env
+            # reference (the image defaults to a public well-known key).
+            - name: PIPELINES_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openwebui-connections-secret
+                  key: PIPELINES_API_KEY
           envFrom:
             - secretRef:
                 name: guardrails-langfuse-secret
@@ -51,6 +99,9 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /app/pipelines
+            - name: managed-filter
+              mountPath: /managed
+              readOnly: true
           resources:
             requests:
               cpu: "100m"
@@ -59,15 +110,35 @@ spec:
               cpu: "500m"
               memory: "512Mi"
           readinessProbe:
-            httpGet:
-              path: /
-              port: 9099
+            # Authenticated readiness: server up AND the managed Langfuse
+            # filter discoverable with the correct API key (env, not argv).
+            exec:
+              command:
+                - python3
+                - /managed/check_ready.py
             initialDelaySeconds: 15
             periodSeconds: 10
+            timeoutSeconds: 15
+          # Startup (not liveness): gives the container time for the
+          # hash-checked dependency installation and the bounded Langfuse
+          # startup authentication (up to 300s budget) before the readiness
+          # probe governs traffic. No liveness probe: an external Langfuse
+          # outage must not trigger unexpected container restarts.
+          startupProbe:
+            exec:
+              command:
+                - python3
+                - /managed/check_ready.py
+            periodSeconds: 10
+            timeoutSeconds: 15
+            failureThreshold: 36  # 6 minutes >= 300s auth budget + pip install
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: pipelines-data
+        - name: managed-filter
+          configMap:
+            name: pipelines-langfuse-filter
 ---
 apiVersion: v1
 kind: Service

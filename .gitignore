@@ -13,3 +13,6 @@ shared-cluster/deploy-model/values.yaml
 *.tmp
 *.bak
 
+# Python bytecode
+__pycache__/
+

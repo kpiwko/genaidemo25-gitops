@@ -95,7 +95,10 @@ genaidemo25-gitops/
 │       └── qwen35-35b-a3b-hsworkshop.yaml    # Reference (not deployed)
 └── module-hsworkshop/                # HS Workshop AI stack
     ├── hsworkshop-argocd-app.yaml    # ArgoCD Application definition
-    ├── configuration-models.json     # OpenWebUI model presets (import via Admin Panel)
+    ├── provisioning/                 # Headless preset provisioning (PostSync Job artifacts)
+    │   ├── configuration-models.json #   OpenWebUI model presets (sole provisioning input)
+    │   ├── provision_openwebui.py    #   additive preset provisioner (stdlib only)
+    │   └── kustomization.yaml        #   content-hash ConfigMap generator
     ├── apply-secrets.sh              # One-time secret generation and apply script
     ├── apply-trustyai-patches.sh     # Re-apply TrustyAI config patches after reconcile
     ├── apply-custom-domain-secret.sh # Out-of-band Cloudflare DNS-01 token Secret (custom domain)
@@ -117,6 +120,7 @@ genaidemo25-gitops/
         ├── pipelines.yaml
         ├── searxng.yaml
         ├── openwebui.yaml
+        ├── openwebui-provisioning.yaml # PostSync preset provisioning Job (headless)
         ├── guardrails.yaml
         ├── profanity-detector.yaml   # TrustyAI guardrails proxy with Langfuse tagging
         ├── insights.yaml             # HSWorkshop Insights backend + frontend
