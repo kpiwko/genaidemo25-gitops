@@ -40,7 +40,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: proxy
-          image: ghcr.io/kpiwko/hsworkshop-guardrails-proxy@sha256:b818b5f5e7a0ba59de9ec951b5140202b04b0d266df9efec03195f7eca59cba4
+          image: ghcr.io/kpiwko/hsworkshop-guardrails-proxy@sha256:6911359ad1836881d46024b7618bc5c865ae466b4b5b887c1af109fab59759e5
           ports:
             - containerPort: 8080
           envFrom:
