@@ -282,7 +282,7 @@ class TestPreservationAndOverlay(unittest.TestCase):
         # No competing singular form.
         self.assertNotIn("OPENAI_API_BASE_URL", env)
         self.assertNotIn("OPENAI_API_KEY", env)
-        self.assertEqual(env["ENABLE_SIGNUP"]["value"], "false")
+        self.assertEqual(env["ENABLE_SIGNUP"]["value"], "true")
         self.assertEqual(env["ENABLE_PERSISTENT_CONFIG"]["value"], "false")
 
     def test_web_search_preserved_off_and_code_tools_on_in_base(self):
@@ -352,7 +352,7 @@ class TestPreservationAndOverlay(unittest.TestCase):
         self.assertEqual(env["WEBUI_URL"]["value"], "https://chat.hsworkshop.fous.ai")
         self.assertTrue(env["OPENAI_API_BASE_URLS"]["value"].startswith(
             "http://guardrails-proxy"), env["OPENAI_API_BASE_URLS"]["value"])
-        self.assertEqual(env["ENABLE_SIGNUP"]["value"], "false")
+        self.assertEqual(env["ENABLE_SIGNUP"]["value"], "true")
         # The provisioning Job and its hash CM flow through the overlay
         # unchanged (same name/hash as the base).
         base_cm = [d for d in self.base if d["kind"] == "ConfigMap"

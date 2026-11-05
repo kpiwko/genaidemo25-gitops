@@ -3,7 +3,7 @@
 
 Python stdlib only — runs inside the pinned OpenWebUI image with no extra
 dependencies. Provisions exactly the two managed workshop presets
-(``career-guide``, ``free-chat`` on ``qwen36-service``) through the
+(``lunch``, ``greenhouse`` on ``qwen36-service``) through the
 OpenWebUI REST API and nothing else:
 
   1. ``POST /api/v1/auths/signin``      — existing admin session (fail
@@ -18,7 +18,7 @@ OpenWebUI REST API and nothing else:
   4. ``POST /api/v1/models/model/access/update`` — architect-approved
      addition (the ONLY extra mutating route, pinned exception, not a new
      auth policy), scoped to exactly the managed model ids
-     ``career-guide``/``free-chat``: body ``{id, access_grants}``
+     ``lunch``/``greenhouse``: body ``{id, access_grants}``
      converges ACL drift to the exact public-read grant. The 200 response
      is ``ModelModel | null``; ``null`` is NOT treated as success — the
      mandatory re-read is decisive.
@@ -66,7 +66,7 @@ import urllib.request
 
 # --- Managed scope (exact, per plan Task 4) -------------------------------
 
-MANAGED_MODEL_IDS = frozenset({"career-guide", "free-chat"})
+MANAGED_MODEL_IDS = frozenset({"lunch", "greenhouse"})
 MANAGED_BASE_MODEL_ID = "qwen36-service"
 
 # The exact architect-verified public-read grant (0.12.5 AccessGrantModel
@@ -510,7 +510,7 @@ def _import_form_for_update(preset: dict, record: dict) -> dict:
     CONFIG fields replaced. The open ``meta`` object is MERGED: managed
     preset keys are replaced — an explicitly-absent managed key in the
     preset is written as ``None`` (clearing it, e.g. defaultFeatureIds or
-    suggestion_prompts on free-chat) while other server meta keys (e.g. a
+    suggestion_prompts on greenhouse) while other server meta keys (e.g. a
     profile image) stay untouched. Grants are NOT managed here: OpenWebUI
     0.12.5 import updates never replace grants, so the server's grant
     dicts are passed through VERBATIM (they cannot be changed by this
@@ -529,7 +529,7 @@ def _import_form_for_update(preset: dict, record: dict) -> dict:
         else:
             # Managed key ABSENT from the desired preset: write None so an
             # operator-added value is cleared (e.g. defaultFeatureIds or
-            # suggestion_prompts on free-chat). Unmanaged server meta keys
+            # suggestion_prompts on greenhouse). Unmanaged server meta keys
             # are never touched (no broad deletion).
             merged_meta[key] = None
     form["meta"] = merged_meta

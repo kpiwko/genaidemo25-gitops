@@ -40,11 +40,11 @@ PUBLIC_READ_GRANT = dict(prov.PUBLIC_READ_GRANT)
 # --- Preset / record helpers -------------------------------------------------
 
 
-def _base_preset(mid="career-guide", **over):
+def _base_preset(mid="lunch", **over):
     preset = {
         "id": mid,
         "base_model_id": "qwen36-service",
-        "name": "Career Guide",
+        "name": "Lunch",
         "params": {"system": "Be helpful."},
         "meta": {
             "description": "Career guide preset.",
@@ -63,10 +63,10 @@ def _base_preset(mid="career-guide", **over):
 
 def _presets():
     return [
-        _base_preset("career-guide"),
+        _base_preset("lunch"),
         _base_preset(
-            "free-chat",
-            name="Free Chat",
+            "greenhouse",
+            name="Greenhouse",
             params={},
             meta={"description": "Open chat.", "capabilities": {"web_search": False}},
         ),
@@ -235,7 +235,7 @@ def _access_updates():
 class TestSanitizedPresetsFile(unittest.TestCase):
     def test_file_loads_and_covers_exactly_managed_ids(self):
         presets = prov.load_presets(PRESETS_PATH)
-        self.assertEqual({p["id"] for p in presets}, {"career-guide", "free-chat"})
+        self.assertEqual({p["id"] for p in presets}, {"lunch", "greenhouse"})
         for preset in presets:
             self.assertEqual(preset["base_model_id"], "qwen36-service")
             self.assertEqual(
@@ -462,7 +462,7 @@ class TestLoadPresets(unittest.TestCase):
         os.unlink(path)
 
     def test_bad_model_id_in_file_fails(self):
-        path = self._write([_base_preset("rogue-model"), _base_preset("free-chat")])
+        path = self._write([_base_preset("rogue-model"), _base_preset("greenhouse")])
         with self.assertRaises(prov.ProvisioningError):
             prov.load_presets(path)
         os.unlink(path)
@@ -633,8 +633,8 @@ class TestProvisioning(ProvisioningTestCase):
         self.assertEqual(counts["verified"], True)
         self.assertEqual(len(state["forms"]), 1)
         form = state["forms"][0]
-        self.assertEqual(form["id"], "career-guide")
-        self.assertEqual(form["name"], "Career Guide")
+        self.assertEqual(form["id"], "lunch")
+        self.assertEqual(form["name"], "Lunch")
         # Server ownership and unmanaged metadata preserved verbatim.
         self.assertEqual(form["user_id"], drifted["user_id"])
         self.assertEqual(form["user"], drifted["user"])
@@ -681,7 +681,7 @@ class TestProvisioning(ProvisioningTestCase):
         self.assertEqual(len(state["access_bodies"]), 1)
         self.assertEqual(
             state["access_bodies"][0],
-            {"id": "career-guide", "access_grants": [dict(PUBLIC_READ_GRANT)]},
+            {"id": "lunch", "access_grants": [dict(PUBLIC_READ_GRANT)]},
         )
         self.assertEqual(_imports(), [])
 
@@ -698,7 +698,7 @@ class TestProvisioning(ProvisioningTestCase):
             state["forms"].extend(body["models"])
             state["import_order"].append(len(state["access_order"]))
             # Config update lands; grants UNCHANGED by import (0.12.5).
-            updated = _server_record(_presets()[0], name="Career Guide")
+            updated = _server_record(_presets()[0], name="Lunch")
             updated["user_id"] = drifted["user_id"]
             updated["user"] = drifted["user"]
             updated["access_grants"] = []  # import does not touch grants
@@ -708,7 +708,7 @@ class TestProvisioning(ProvisioningTestCase):
         def access_handler(body, headers):
             state["access_bodies"].append(body)
             state["access_order"].append(len(state["import_order"]))
-            updated = _server_record(_presets()[0], name="Career Guide")
+            updated = _server_record(_presets()[0], name="Lunch")
             updated["user_id"] = drifted["user_id"]
             updated["user"] = drifted["user"]
             state["records"] = [updated, records[1]]
@@ -849,10 +849,10 @@ class TestProvisioning(ProvisioningTestCase):
 
     def test_operator_added_managed_meta_key_is_cleared(self):
         # Review case (bug 3): an operator added a managed meta key on the
-        # server (e.g. defaultFeatureIds on free-chat, whose preset omits
+        # server (e.g. defaultFeatureIds on greenhouse, whose preset omits
         # it); the reconcile must CLEAR it (explicit None in the import
         # form), preserving unmanaged server meta keys — no broad deletion.
-        record = _server_record(_presets()[1])  # free-chat preset has no defaultFeatureIds
+        record = _server_record(_presets()[1])  # greenhouse preset has no defaultFeatureIds
         record["meta"]["defaultFeatureIds"] = ["web_search", "image_generation"]
         records = [_server_record(_presets()[0]), record]
         state = {"records": records, "forms": []}
@@ -878,7 +878,7 @@ class TestProvisioning(ProvisioningTestCase):
         counts = self.run_provision(base)
         self.assertEqual(counts["verified"], True)
         form = state["forms"][0]
-        self.assertEqual(form["id"], "free-chat")
+        self.assertEqual(form["id"], "greenhouse")
         # Explicit None clears the managed key...
         self.assertIsNone(form["meta"]["defaultFeatureIds"])
         # ...while unmanaged server meta is preserved (no broad deletion).
@@ -913,7 +913,7 @@ class TestProvisioning(ProvisioningTestCase):
 
     def test_tags_normalization_none_and_empty_converge(self):
         # Review-2 case (B3 tags clearing): the pinned 0.12.5
-        # ModelMeta.normalize_tags converts tags None -> []. The free-chat
+        # ModelMeta.normalize_tags converts tags None -> []. The greenhouse
         # preset OMITS tags; a server reporting tags: [] (normalized null)
         # is converged (no write). An operator-ADDED tags list on the
         # server is cleared (import form writes the managed key as None),
@@ -960,7 +960,7 @@ class TestProvisioning(ProvisioningTestCase):
         counts = self.run_provision(base)
         self.assertEqual(counts["verified"], True)
         form = state["forms"][0]
-        self.assertEqual(form["id"], "free-chat")
+        self.assertEqual(form["id"], "greenhouse")
         # The managed key is explicitly cleared in the import form...
         self.assertIsNone(form["meta"]["tags"])
         # ...and the final state ([] normalized) is a converged no-op.
@@ -1025,7 +1025,7 @@ class TestProvisioning(ProvisioningTestCase):
         # Both created models' ACLs were repaired via the access endpoint.
         self.assertEqual(
             sorted(b["id"] for b in state["access_bodies"]),
-            ["career-guide", "free-chat"],
+            ["greenhouse", "lunch"],
         )
         for body in state["access_bodies"]:
             self.assertEqual(body["access_grants"], [dict(PUBLIC_READ_GRANT)])
@@ -1081,7 +1081,7 @@ class TestProvisioning(ProvisioningTestCase):
         self.assertEqual(_imports(), [])
 
     def test_unknown_server_schema_fails_before_writes(self):
-        weird = [{"id": "career-guide", "something": "unexpected"}]
+        weird = [{"id": "lunch", "something": "unexpected"}]
         base = self._serve(
             {
                 prov.SIGNIN_PATH: self._signin_ok(),

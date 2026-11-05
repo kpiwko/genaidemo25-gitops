@@ -19,7 +19,7 @@ User → OpenWebUI → guardrails-proxy → TrustyAI gateway → KServe Inferenc
                                     HSWorkshop Insights
                                     (word cloud · word graph · AI summary)
 
-       SearXNG (self-hosted web search, used by Career Guide preset)
+       SearXNG (self-hosted web search, available to presets)
 ```
 
 | Component | Purpose |
@@ -27,7 +27,7 @@ User → OpenWebUI → guardrails-proxy → TrustyAI gateway → KServe Inferenc
 | OpenWebUI | Chat UI with OpenAI-compatible backend |
 | guardrails-proxy | Nginx→Python proxy routing chat through TrustyAI, model listing direct to predictor; tags blocked requests in Langfuse |
 | TrustyAI | Guardrails orchestrator — built-in regex detector blocks swear words (Czech + English) |
-| SearXNG | Self-hosted metasearch engine for web search in Career Guide preset |
+| SearXNG | Self-hosted metasearch engine for web search (currently not enabled in the Lunch/Greenhouse presets) |
 | Pipelines | Filter layer enabling Langfuse tracing in OpenWebUI |
 | Langfuse | LLM observability: traces, costs, latency |
 | HSWorkshop Insights | Visualizes conversation traces — word cloud, word graph, AI summary; supports valid/blocked filtering |
@@ -88,7 +88,7 @@ The admin account's credentials are referenced explicitly from `openwebui-admin-
 1. Open https://openwebui-hsworkshop.apps.kpicl2-pool-rft8p.aws.rh-ods.com
 2. Log in with the email and password you saved in your password manager
 
-Signup is declared disabled in `openwebui.yaml` (`ENABLE_SIGNUP=false`, matching the live effective policy) and `DEFAULT_USER_ROLE=user`; new users are created by the operator, not self-registration.
+Signup is temporarily **enabled** for the workshop in `openwebui.yaml` (`ENABLE_SIGNUP=true`) with `DEFAULT_USER_ROLE=user`; participants register their own accounts. Set it back to `false` after the workshop.
 
 > **Note:** If updating an existing install, the signup setting may already be stored in the database. Enable it manually if needed: Admin Panel → Settings → General → Enable New User Sign Up → on.
 
@@ -102,8 +102,8 @@ Admin Panel setup is needed:
   proxy first, Pipelines second; keys composed from
   `openwebui-connections-secret` via explicit secretKeyRefs). With
   `ENABLE_PERSISTENT_CONFIG=false` the declared env governs startup config.
-- **Model presets** (`provisioning/configuration-models.json` — Career
-  Guide and Free Chat, with public read visibility) are provisioned by the
+- **Model presets** (`provisioning/configuration-models.json` — Lunch
+  (high temperature) and Greenhouse (low temperature, design-assistant system prompt), with public read visibility) are provisioned by the
   `openwebui-workshop-provision` PostSync Job on every Argo CD sync: after
   the sync's resources are healthy, the Job signs in as the existing admin
   (credentials from `openwebui-admin-bootstrap-secret`), diffs the managed
@@ -176,7 +176,7 @@ The guardrails proxy tags blocked requests in Langfuse with `tags: ["blocked"]` 
 
 ### 6. Model presets (automatic)
 
-The two workshop presets (**Career Guide** and **Free Chat**, public read
+The two workshop presets (**Lunch** and **Greenhouse**, public read
 visibility) live in `provisioning/configuration-models.json` and are
 provisioned automatically by the `openwebui-workshop-provision` PostSync Job
 on every Argo CD sync (see step 4) — no manual Admin Panel import is needed,
@@ -192,7 +192,7 @@ presets:
 
 | File | Purpose |
 |------|---------|
-| `provisioning/configuration-models.json` | OpenWebUI model presets (Career Guide, Free Chat) — sole input of the PostSync provisioning Job |
+| `provisioning/configuration-models.json` | OpenWebUI model presets (Lunch, Greenhouse) — sole input of the PostSync provisioning Job |
 | `provisioning/provision_openwebui.py` | Additive preset provisioner run by the PostSync Job (stdlib only) |
 | `domain/render.sh` | Deterministic renderer for the optional custom-domain overlay (non-secret inputs) |
 | `apply-custom-domain-secret.sh` | Out-of-band provisioning of the Cloudflare DNS-01 token Secret (never in Git) |

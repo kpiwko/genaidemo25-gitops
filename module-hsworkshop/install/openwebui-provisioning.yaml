@@ -1,7 +1,7 @@
 # OpenWebUI PostSync preset provisioning Job (Task 5, ADR-0002).
 #
 # A bounded, authenticated, ADDITIVE one-shot Job that converges exactly the
-# two managed workshop presets (career-guide / free-chat on qwen36-service)
+# two managed workshop presets (lunch / greenhouse on qwen36-service)
 # via the OpenWebUI REST API:
 #   POST /api/v1/auths/signin -> GET /api/v1/models/all ->
 #   POST /api/v1/models/import (changed-only, inserts carry grants) ->

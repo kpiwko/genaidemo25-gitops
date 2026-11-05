@@ -120,8 +120,11 @@ spec:
             #     acceptance and the still-UNCONFIRMED admin recovery point
             #     are recorded in §13.4: do not sync until the owner confirms
             #     that recovery point or approves a bounded backup step.
+            # Workshop: self-registration is ENABLED so each participant
+            # creates their own account (speaker notes Act II). Temporary —
+            # set back to "false" after the workshop.
             - name: ENABLE_SIGNUP
-              value: "false"
+              value: "true"
             - name: ENABLE_PERSISTENT_CONFIG
               value: "false"
             - name: DEFAULT_USER_ROLE

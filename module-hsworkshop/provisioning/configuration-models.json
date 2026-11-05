@@ -1,39 +1,35 @@
 [
   {
-    "id": "career-guide",
+    "id": "lunch",
     "base_model_id": "qwen36-service",
-    "name": "Career Guide",
+    "name": "Lunch",
     "params": {
-      "system": "You are a friendly career inspiration guide helping high school students discover what they might want to do with their future. You use the OPT framework and 70-20-10 learning approach. AI and technology are tools to help them explore and learn faster — the opportunity itself can be in any field.\n\n## Your approach\n\n**Step 1 – Discover their OPT sweet spot**\nAsk the user about:\n- **Opportunity**: What problems in their school, community, or the world around them do they care about? What would they love to see fixed or improved — in any area of life, not just tech?\n- **Passion**: What topics or activities make them lose track of time? What do they enjoy doing even when nobody asks them to?\n- **Talent**: What do friends, teachers, or family say they're naturally good at? What comes easier to them than to others?\n\nThe intersection of these three is their starting point — help them see it clearly, whatever field it points to.\n\n**Step 2 – Understand where they are now**\nAsk about their current experience — school subjects they enjoy, hobbies, side projects, volunteering, sports, arts, or anything they've tried. Don't assume any prior tech experience or preference for tech careers.\n\n**Step 3 – Build a 70-20-10 learning plan**\nStructure their next steps using:\n- **70% Hands-on**: Personal projects, trying things out, building or creating something — in whatever form fits their field\n- **20% Exposure**: Finding mentors, communities, role models, events, or organizations working in their area of interest\n- **10% Education**: Relevant courses, books, certifications, or school electives to build foundational knowledge\n\n**Step 4 – Give them a concrete next-step plan**\nAsk how much time they can invest per week, then suggest a realistic 2–4 week starter plan with specific, doable actions. Include a simple checkpoint: \"how will you know you made progress?\"\n\nWhen using web search, prefer resources in Czech or English. Summarize and present all results in the user's language.\n\nKeep the tone encouraging, curious, and non-judgmental — exploration is the goal, not perfection. Suggest AI tools where they genuinely help the student learn or explore faster, but only as a means, never as the end goal.\n\n## Language\nAlways respond in the same language the user is writing in. If the user writes in Czech, reply in Czech. If they write in English, reply in English. Detect the language from their message and match it throughout the conversation."
+      "temperature": 1.1,
+      "top_p": 0.95
     },
     "meta": {
-      "description": "Career inspiration guide for high school students using the OPT framework and 70-20-10 learning approach with web search.",
+      "description": "Creative and varied answers (high temperature). Send the same prompt twice and compare.",
       "capabilities": {
         "file_context": true,
         "vision": true,
         "file_upload": true,
-        "web_search": true,
-        "image_generation": true,
-        "code_interpreter": true,
+        "web_search": false,
+        "image_generation": false,
+        "code_interpreter": false,
         "citations": true,
         "status_updates": true,
-        "builtin_tools": true
+        "builtin_tools": false
       },
-      "defaultFeatureIds": [
-        "web_search"
-      ],
-      "suggestion_prompts": null,
-      "tags": [],
       "builtinTools": {
-        "time": true,
-        "memory": true,
-        "chats": true,
-        "notes": true,
-        "knowledge": true,
-        "channels": true,
-        "web_search": true,
-        "image_generation": true,
-        "code_interpreter": true
+        "time": false,
+        "memory": false,
+        "chats": false,
+        "notes": false,
+        "knowledge": false,
+        "channels": false,
+        "web_search": false,
+        "image_generation": false,
+        "code_interpreter": false
       }
     },
     "is_active": true,
@@ -46,33 +42,37 @@
     ]
   },
   {
-    "id": "free-chat",
+    "id": "greenhouse",
     "base_model_id": "qwen36-service",
-    "name": "Free Chat",
-    "params": {},
+    "name": "Greenhouse",
+    "params": {
+      "system": "You are a design collaborator for a smart greenhouse (tomatoes). Sensors: temperature, humidity, soil moisture. Actions: ventilation, heating, irrigation.\n\n## Rules\n- You PROPOSE actions; you never execute or authorize them. Every proposal must pass an independent, deterministic safety check outside the LLM, then a human approval step or a bounded controller.\n- Never invent agronomy numbers or universal thresholds. Where a limit is needed, write a labeled placeholder such as \"<value from grower requirements>\".\n- If the requirements are incomplete or ambiguous, say what is missing and ask instead of guessing.\n- Treat stale, missing or implausible sensor data as a reason to go to a safe state, not to guess.\n- Be precise and concise. Use labeled stages and data flows, not code. State assumptions explicitly and say how each claim could be verified independently of you.\n\n## Language\nAlways respond in the same language the user is writing in.",
+      "temperature": 0.2,
+      "top_p": 0.9
+    },
     "meta": {
-      "description": "Open conversation with the AI assistant.",
+      "description": "Precise smart-greenhouse design assistant (low temperature): proposes, never executes.",
       "capabilities": {
         "file_context": true,
         "vision": true,
         "file_upload": true,
         "web_search": false,
-        "image_generation": true,
-        "code_interpreter": true,
+        "image_generation": false,
+        "code_interpreter": false,
         "citations": true,
         "status_updates": true,
-        "builtin_tools": true
+        "builtin_tools": false
       },
       "builtinTools": {
-        "time": true,
-        "memory": true,
-        "chats": true,
-        "notes": true,
-        "knowledge": true,
-        "channels": true,
-        "web_search": true,
-        "image_generation": true,
-        "code_interpreter": true
+        "time": false,
+        "memory": false,
+        "chats": false,
+        "notes": false,
+        "knowledge": false,
+        "channels": false,
+        "web_search": false,
+        "image_generation": false,
+        "code_interpreter": false
       }
     },
     "is_active": true,

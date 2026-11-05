@@ -406,7 +406,7 @@ class OpenWebuiManifestTest(unittest.TestCase):
     def test_startup_config_policy_envs(self):
         envs = self._env_map()
         self.assertEqual(envs["ENABLE_PERSISTENT_CONFIG"]["value"], "false")
-        self.assertEqual(envs["ENABLE_SIGNUP"]["value"], "false")
+        self.assertEqual(envs["ENABLE_SIGNUP"]["value"], "true")
         self.assertEqual(envs["DEFAULT_USER_ROLE"]["value"], "user")
 
     def test_admin_bootstrap_refs_override_legacy_envfrom(self):
