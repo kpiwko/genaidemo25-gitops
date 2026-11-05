@@ -39,7 +39,7 @@ spec:
         - name: backend
           # Built by GitHub Actions from github.com/kpiwko/hsworkshop-insights
           # (Langfuse v4 API); multi-arch image pinned by digest (commit b42fa29).
-          image: ghcr.io/kpiwko/hsworkshop-insights-backend@sha256:cdc2ce33daab5184108df24ec4868292fe8f405ff083daa652f6312759bfd1a7
+          image: ghcr.io/kpiwko/hsworkshop-insights-backend@sha256:512236abf0a0c71e72066cf66d3c887902ff36d54596d54c52b240e2d4e6d6d4
           ports:
             - containerPort: 8000
           envFrom:
@@ -92,7 +92,7 @@ spec:
       containers:
         - name: frontend
           # Same repository and commit as the backend, pinned by digest.
-          image: ghcr.io/kpiwko/hsworkshop-insights-frontend@sha256:a1c90bcf9b84e8a55978c806c2b96bb9ff19d439d7933238f2f66c59c08697b0
+          image: ghcr.io/kpiwko/hsworkshop-insights-frontend@sha256:b14ad7f2abea43707c8ddf0f7cc7f3c176740c5ce177bd059310888a191b8c20
           ports:
             - containerPort: 8080
           resources:
