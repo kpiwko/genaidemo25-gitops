@@ -4,282 +4,29 @@
 # When the gateway blocks a prompt (UNSUITABLE_INPUT), converts the empty
 # choices response into a proper assistant message so OpenWebUI shows a
 # friendly bilingual message and the conversation can continue normally.
-# All other endpoints (/v1/models, etc.) are forwarded directly to the predictor.
+# /v1/models is forwarded directly to the predictor.
+#
+# Source and image build: https://github.com/kpiwko/hsworkshop-guardrails-proxy
+# (async Starlette/Uvicorn proxy, native multi-arch image published by GitHub
+# Actions to GHCR; pinned here by digest). Two replicas, up to 40 concurrent
+# chats each (GUARDRAILS_PROXY_MAX_CHATS); overflow gets an immediate 503.
 #
 # Blocked requests are also tagged in Langfuse (tags: ["blocked"]) via the
 # guardrails-langfuse-secret — see langfuse-proxy-secret.yaml.
 #
 # OpenWebUI OPENAI_API_BASE_URL: http://guardrails-proxy.hsworkshop.svc.cluster.local:8080/v1
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: guardrails-proxy-config
-  namespace: hsworkshop
-data:
-  proxy.py: |
-    #!/usr/bin/env python3
-    import base64
-    import json
-    import os
-    import threading
-    import time
-    import urllib.request
-    import urllib.error
-    from http.server import HTTPServer, BaseHTTPRequestHandler
-
-    GUARDRAILS = "http://guardrails-orchestrator-service.hsworkshop.svc.cluster.local:8090/all"
-    PREDICTOR  = "http://qwen36-service-predictor.hsworkshop.svc.cluster.local:8080"
-
-    LANGFUSE_HOST       = os.environ.get("LANGFUSE_HOST", "")
-    LANGFUSE_PUBLIC_KEY = os.environ.get("LANGFUSE_PUBLIC_KEY", "")
-    LANGFUSE_SECRET_KEY = os.environ.get("LANGFUSE_SECRET_KEY", "")
-
-    MSG_EN = (
-        "\u26a0\ufe0f Your message was blocked because it contained inappropriate language. "
-        "Please rephrase your question without swear words."
-    )
-    MSG_CS = (
-        "\u26a0\ufe0f V\u00e1\u0161 dotaz byl zablokov\u00e1n, proto\u017ee obsahoval nevhodn\u00fd v\u00fdraz. "
-        "Zkuste ho p\u0159eformulovat bez vulgarit."
-    )
-    BLOCKED_CONTENT = f"{MSG_EN}\n\n{MSG_CS}"
-
-    PASSTHROUGH_HEADERS = {"authorization", "content-type", "accept"}
-
-    def _forward_headers(source_headers):
-        return {k: v for k, v in source_headers.items()
-                if k.lower() in PASSTHROUGH_HEADERS}
-
-    def _is_blocked(data: dict) -> bool:
-        choices  = data.get("choices", None)
-        warnings = data.get("warnings") or []
-        return (
-            isinstance(choices, list) and len(choices) == 0
-            and any(w.get("type") == "UNSUITABLE_INPUT" for w in warnings)
-        )
-
-    def _extract_last_user_message(messages: list) -> str:
-        for msg in reversed(messages):
-            if isinstance(msg, dict) and msg.get("role") == "user":
-                return msg.get("content", "")
-        return ""
-
-    def _otel_attr(key: str, value) -> dict:
-        if isinstance(value, list):
-            return {"key": key, "value": {"arrayValue": {"values": [{"stringValue": str(v)} for v in value]}}}
-        return {"key": key, "value": {"stringValue": str(value)}}
-
-    def _tag_blocked_in_langfuse(user_message: str, model: str) -> None:
-        """Fire-and-forget: record a blocked request in Langfuse v4.
-
-        Sends one OTLP/HTTP-JSON root span (Langfuse v4 removed POST /api/public/traces).
-        Insights finds these via the 'blocked' tag on the root observation.
-        """
-        if not LANGFUSE_HOST or not LANGFUSE_PUBLIC_KEY or not LANGFUSE_SECRET_KEY:
-            return
-        def _send():
-            try:
-                creds = base64.b64encode(
-                    f"{LANGFUSE_PUBLIC_KEY}:{LANGFUSE_SECRET_KEY}".encode()
-                ).decode()
-                now_ns = time.time_ns()
-                span = {
-                    "traceId": os.urandom(16).hex(),
-                    "spanId": os.urandom(8).hex(),
-                    "name": "blocked-request",
-                    "kind": 1,
-                    "startTimeUnixNano": str(now_ns),
-                    "endTimeUnixNano": str(now_ns + 1_000_000),
-                    "attributes": [
-                        _otel_attr("langfuse.trace.name", "blocked-request"),
-                        _otel_attr("langfuse.trace.tags", ["blocked"]),
-                        _otel_attr("langfuse.observation.type", "guardrail"),
-                        _otel_attr("langfuse.observation.level", "WARNING"),
-                        _otel_attr("langfuse.observation.input", json.dumps({"user_message": user_message}, ensure_ascii=False)),
-                        _otel_attr("langfuse.observation.output", "BLOCKED"),
-                        _otel_attr("langfuse.trace.metadata.reason", "UNSUITABLE_INPUT"),
-                        _otel_attr("langfuse.trace.metadata.model", model),
-                    ],
-                }
-                payload = json.dumps({"resourceSpans": [{
-                    "resource": {"attributes": [_otel_attr("service.name", "guardrails-proxy")]},
-                    "scopeSpans": [{"scope": {"name": "guardrails-proxy"}, "spans": [span]}],
-                }]}).encode()
-                req = urllib.request.Request(
-                    f"{LANGFUSE_HOST}/api/public/otel/v1/traces",
-                    data=payload,
-                    headers={
-                        "Authorization": f"Basic {creds}",
-                        "Content-Type": "application/json",
-                        "x-langfuse-ingestion-version": "4",
-                    },
-                    method="POST",
-                )
-                urllib.request.urlopen(req, timeout=5)
-            except Exception as exc:
-                print(f"[langfuse] failed to tag blocked trace: {exc}", flush=True)
-        threading.Thread(target=_send, daemon=True).start()
-
-    def _json_response(model: str) -> bytes:
-        return json.dumps({
-            "id": "chatcmpl-blocked",
-            "object": "chat.completion",
-            "model": model,
-            "choices": [{
-                "index": 0,
-                "message": {"role": "assistant", "content": BLOCKED_CONTENT},
-                "finish_reason": "stop",
-                "logprobs": None,
-            }],
-            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
-        }).encode()
-
-    def _sse_response(model: str) -> bytes:
-        # Two-chunk SSE: content first, then stop signal, then [DONE]
-        c1 = json.dumps({
-            "id": "chatcmpl-blocked", "object": "chat.completion.chunk",
-            "model": model,
-            "choices": [{"index": 0, "delta": {"role": "assistant", "content": BLOCKED_CONTENT}, "finish_reason": None}],
-        })
-        c2 = json.dumps({
-            "id": "chatcmpl-blocked", "object": "chat.completion.chunk",
-            "model": model,
-            "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
-        })
-        return f"data: {c1}\n\ndata: {c2}\n\ndata: [DONE]\n\n".encode()
-
-    class Handler(BaseHTTPRequestHandler):
-        protocol_version = "HTTP/1.1"
-
-        def _relay(self, target, body=None, method=None):
-            method = method or self.command
-            headers = _forward_headers(self.headers)
-            req = urllib.request.Request(target, data=body, headers=headers, method=method)
-            try:
-                return urllib.request.urlopen(req, timeout=120)
-            except urllib.error.HTTPError as e:
-                return e
-
-        def _send_body(self, status, content_type, body: bytes):
-            self.send_response(status)
-            self.send_header("Content-Type", content_type)
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Connection", "keep-alive")
-            self.end_headers()
-            self.wfile.write(body)
-
-        def _send_sse(self, body: bytes):
-            self.send_response(200)
-            self.send_header("Content-Type", "text/event-stream")
-            self.send_header("Cache-Control", "no-cache")
-            self.send_header("Connection", "keep-alive")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
-        def do_GET(self):
-            resp = self._relay(f"{PREDICTOR}{self.path}")
-            body = resp.read()
-            ct   = resp.headers.get("Content-Type", "application/json")
-            code = resp.status if hasattr(resp, "status") else resp.code
-            self._send_body(code, ct, body)
-
-        def do_POST(self):
-            length = int(self.headers.get("Content-Length", 0))
-            raw    = self.rfile.read(length)
-
-            if self.path != "/v1/chat/completions":
-                resp = self._relay(f"{PREDICTOR}{self.path}", body=raw)
-                body = resp.read()
-                ct   = resp.headers.get("Content-Type", "application/json")
-                code = resp.status if hasattr(resp, "status") else resp.code
-                self._send_body(code, ct, body)
-                return
-
-            try:
-                req_body = json.loads(raw)
-            except Exception:
-                req_body = {}
-            stream        = req_body.get("stream", False)
-            model         = req_body.get("model", "")
-            messages      = req_body.get("messages", [])
-            user_message  = _extract_last_user_message(messages)
-
-            resp = self._relay(f"{GUARDRAILS}{self.path}", body=raw)
-            ct   = resp.headers.get("Content-Type", "application/json")
-
-            if "text/event-stream" in ct:
-                # Read first SSE event to detect a blocked streaming response.
-                # TrustyAI returns a single SSE chunk with choices:[] for blocked prompts.
-                buf = b""
-                while b"\n\n" not in buf:
-                    chunk = resp.read(256)
-                    if not chunk:
-                        break
-                    buf += chunk
-
-                blocked = False
-                for line in buf.split(b"\n"):
-                    if line.startswith(b"data: ") and line != b"data: [DONE]":
-                        try:
-                            blocked = _is_blocked(json.loads(line[6:]))
-                        except Exception:
-                            pass
-
-                if blocked:
-                    _tag_blocked_in_langfuse(user_message, model)
-                    self._send_sse(_sse_response(model))
-                else:
-                    self._stream_through_with_prefix(buf, resp)
-                return
-
-            # Non-streaming response — check if blocked
-            body = resp.read()
-            blocked = False
-            try:
-                blocked = _is_blocked(json.loads(body))
-            except Exception:
-                pass
-
-            if blocked:
-                _tag_blocked_in_langfuse(user_message, model)
-                if stream:
-                    self._send_sse(_sse_response(model))
-                else:
-                    self._send_body(200, "application/json", _json_response(model))
-            else:
-                self._send_body(200, ct, body)
-
-        def _stream_through_with_prefix(self, prefix: bytes, resp):
-            self.send_response(200)
-            self.send_header("Content-Type", "text/event-stream")
-            self.send_header("Cache-Control", "no-cache")
-            self.send_header("Connection", "close")
-            self.end_headers()
-            self.wfile.write(prefix)
-            self.wfile.flush()
-            while True:
-                chunk = resp.read(4096)
-                if not chunk:
-                    break
-                self.wfile.write(chunk)
-                self.wfile.flush()
-
-        def log_message(self, fmt, *args):
-            print(fmt % args, flush=True)
-
-    if __name__ == "__main__":
-        print("Guardrails proxy listening on :8080", flush=True)
-        print(f"Langfuse tagging: {'enabled' if LANGFUSE_HOST else 'disabled (no LANGFUSE_HOST)'}", flush=True)
-        HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: guardrails-proxy
   namespace: hsworkshop
 spec:
-  replicas: 1
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: guardrails-proxy
@@ -289,36 +36,43 @@ spec:
         app: guardrails-proxy
     spec:
       serviceAccountName: hsworkshop-anyuid
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
       containers:
         - name: proxy
-          image: docker.io/library/python:3.11-slim
-          command: ["python3", "/app/proxy.py"]
+          image: ghcr.io/kpiwko/hsworkshop-guardrails-proxy@sha256:b818b5f5e7a0ba59de9ec951b5140202b04b0d266df9efec03195f7eca59cba4
           ports:
             - containerPort: 8080
           envFrom:
             - secretRef:
                 name: guardrails-langfuse-secret
                 optional: true
-          volumeMounts:
-            - name: config
-              mountPath: /app
           resources:
             requests:
               cpu: "100m"
               memory: "128Mi"
             limits:
-              cpu: "500m"
-              memory: "256Mi"
+              cpu: "1"
+              memory: "512Mi"
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 5
+            timeoutSeconds: 1
+            failureThreshold: 12
           readinessProbe:
             httpGet:
-              path: /v1/models
+              path: /healthz
               port: 8080
-            initialDelaySeconds: 5
-            periodSeconds: 10
-      volumes:
-        - name: config
-          configMap:
-            name: guardrails-proxy-config
+            periodSeconds: 5
+            timeoutSeconds: 1
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 5
+            timeoutSeconds: 1
 ---
 apiVersion: v1
 kind: Service
